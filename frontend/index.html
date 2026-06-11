@@ -1,0 +1,604 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>AC — Voice Assistant</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
+<style>
+  /* ── Reset & base ─────────────────────────────────────────── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:        #0b0c10;
+    --surface:   #13141a;
+    --border:    #1e2030;
+    --text:      #e8eaf0;
+    --muted:     #5a5f7a;
+    --accent:    #6c8dfa;
+    --accent2:   #a78bfa;
+    --green:     #4ade80;
+    --red:       #f87171;
+    --yellow:    #facc15;
+
+    --phase-idle:       var(--muted);
+    --phase-waiting:    var(--yellow);
+    --phase-listening:  var(--accent);
+    --phase-processing: var(--accent2);
+    --phase-error:      var(--red);
+
+    --font-display: 'Space Grotesk', sans-serif;
+    --font-mono:    'Space Mono', monospace;
+  }
+
+  html, body {
+    height: 100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-display);
+    font-size: 16px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ── Layout ───────────────────────────────────────────────── */
+  .app {
+    min-height: 100vh;
+    display: grid;
+    grid-template-rows: auto 1fr auto;
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 0 24px;
+  }
+
+  /* ── Header ───────────────────────────────────────────────── */
+  header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 28px 0 20px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .logo-mark {
+    width: 40px; height: 40px;
+    border-radius: 10px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    display: grid; place-items: center;
+    font-family: var(--font-mono);
+    font-weight: 700;
+    font-size: 14px;
+    letter-spacing: -1px;
+    color: #fff;
+    flex-shrink: 0;
+  }
+
+  .brand { font-size: 20px; font-weight: 600; letter-spacing: -0.5px; }
+  .brand span { color: var(--muted); font-weight: 400; font-size: 14px; margin-left: 8px; }
+
+  .conn-dot {
+    margin-left: auto;
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--muted);
+    transition: background 0.4s;
+  }
+  .conn-dot.online { background: var(--green); box-shadow: 0 0 8px var(--green); }
+
+  /* ── Main content ─────────────────────────────────────────── */
+  main {
+    padding: 36px 0 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 32px;
+  }
+
+  /* ── Orb ──────────────────────────────────────────────────── */
+  .orb-section {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 24px;
+  }
+
+  .orb-wrap {
+    position: relative;
+    width: 140px; height: 140px;
+  }
+
+  /* Outer ring pulse — only during listening */
+  .orb-ring {
+    position: absolute; inset: -16px;
+    border-radius: 50%;
+    border: 2px solid transparent;
+    transition: border-color 0.4s;
+  }
+  .orb-ring.active {
+    border-color: color-mix(in srgb, var(--phase-color, var(--accent)) 40%, transparent);
+    animation: ringPulse 1.6s ease-in-out infinite;
+  }
+
+  @keyframes ringPulse {
+    0%, 100% { transform: scale(1); opacity: 1; }
+    50%       { transform: scale(1.1); opacity: 0.4; }
+  }
+
+  .orb {
+    position: absolute; inset: 0;
+    border-radius: 50%;
+    background: radial-gradient(
+      circle at 38% 36%,
+      color-mix(in srgb, var(--phase-color, var(--muted)) 60%, #fff 40%),
+      color-mix(in srgb, var(--phase-color, var(--muted)) 90%, var(--bg)) 70%,
+      var(--bg)
+    );
+    transition: --phase-color 0.5s, background 0.5s;
+    box-shadow:
+      0 0 40px color-mix(in srgb, var(--phase-color, var(--muted)) 25%, transparent),
+      inset 0 1px 0 rgba(255,255,255,0.08);
+  }
+
+  /* Mic icon inside orb */
+  .orb-icon {
+    position: absolute; inset: 0;
+    display: grid; place-items: center;
+  }
+  .orb-icon svg { width: 36px; height: 36px; color: rgba(255,255,255,0.85); }
+
+  /* Soundwave bars — appear only when listening */
+  .waves {
+    display: flex;
+    align-items: flex-end;
+    gap: 3px;
+    height: 28px;
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+  .waves.active { opacity: 1; }
+  .waves span {
+    width: 4px;
+    border-radius: 2px;
+    background: var(--phase-color, var(--accent));
+    animation: wave 0.9s ease-in-out infinite;
+  }
+  .waves span:nth-child(1) { animation-delay: 0s;    height: 40%; }
+  .waves span:nth-child(2) { animation-delay: 0.12s; height: 70%; }
+  .waves span:nth-child(3) { animation-delay: 0.24s; height: 100%; }
+  .waves span:nth-child(4) { animation-delay: 0.12s; height: 70%; }
+  .waves span:nth-child(5) { animation-delay: 0s;    height: 40%; }
+
+  @keyframes wave {
+    0%, 100% { transform: scaleY(0.4); }
+    50%       { transform: scaleY(1); }
+  }
+
+  /* ── Status card ──────────────────────────────────────────── */
+  .status-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 20px 24px;
+  }
+
+  .status-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .phase-badge {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    padding: 3px 9px;
+    border-radius: 6px;
+    background: color-mix(in srgb, var(--phase-color, var(--muted)) 15%, transparent);
+    color: var(--phase-color, var(--muted));
+    border: 1px solid color-mix(in srgb, var(--phase-color, var(--muted)) 30%, transparent);
+    flex-shrink: 0;
+    transition: all 0.4s;
+  }
+
+  .status-msg {
+    font-size: 15px;
+    color: var(--text);
+    flex: 1;
+    line-height: 1.4;
+  }
+
+  /* ── Timeout bar ──────────────────────────────────────────── */
+  .timeout-wrap {
+    margin-top: 14px;
+    display: none;
+  }
+  .timeout-wrap.active { display: block; }
+
+  .timeout-label {
+    font-size: 11px;
+    font-family: var(--font-mono);
+    color: var(--muted);
+    margin-bottom: 6px;
+    display: flex;
+    justify-content: space-between;
+  }
+  .timeout-label span { color: var(--accent); }
+
+  .timeout-track {
+    height: 3px;
+    background: var(--border);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .timeout-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    border-radius: 2px;
+    transition: width 0.5s linear, background 0.4s;
+    width: 100%;
+  }
+  .timeout-fill.urgent { background: linear-gradient(90deg, var(--yellow), var(--red)); }
+
+  /* ── History ──────────────────────────────────────────────── */
+  .section-label {
+    font-size: 11px;
+    font-family: var(--font-mono);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 14px;
+  }
+
+  .history-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .history-item {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 16px;
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 12px;
+    align-items: start;
+    animation: slideIn 0.3s ease;
+  }
+
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateY(-8px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .hist-icon {
+    width: 28px; height: 28px;
+    border-radius: 8px;
+    display: grid; place-items: center;
+    font-size: 13px;
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+  .hist-icon.ok    { background: color-mix(in srgb, var(--green) 15%, transparent); color: var(--green); }
+  .hist-icon.fail  { background: color-mix(in srgb, var(--red)   15%, transparent); color: var(--red);   }
+
+  .hist-body { min-width: 0; }
+  .hist-cmd {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .hist-resp {
+    font-size: 13px;
+    color: var(--muted);
+    margin-top: 2px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .hist-time {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 4px;
+  }
+
+  .empty-state {
+    text-align: center;
+    color: var(--muted);
+    font-size: 14px;
+    padding: 32px 0;
+    border: 1px dashed var(--border);
+    border-radius: 10px;
+  }
+  .empty-state .empty-icon { font-size: 28px; margin-bottom: 8px; }
+
+  /* ── Footer ───────────────────────────────────────────────── */
+  footer {
+    padding: 20px 0;
+    border-top: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 12px;
+    color: var(--muted);
+    font-family: var(--font-mono);
+  }
+
+  .footer-commands {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+  .cmd-chip {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 3px 8px;
+    font-size: 11px;
+    color: var(--muted);
+  }
+
+  /* ── Responsive ───────────────────────────────────────────── */
+  @media (max-width: 600px) {
+    .app { padding: 0 16px; }
+    .footer-commands { display: none; }
+  }
+
+  /* ── @property for CSS variable transitions ───────────────── */
+  @property --phase-color {
+    syntax: '<color>';
+    inherits: true;
+    initial-value: #5a5f7a;
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <header>
+    <div class="logo-mark">AC</div>
+    <div class="brand">Voice Assistant <span>v1.0</span></div>
+    <div class="conn-dot" id="connDot"></div>
+  </header>
+
+  <main>
+
+    <!-- Orb + waves -->
+    <div class="orb-section">
+      <div class="orb-wrap">
+        <div class="orb-ring" id="orbRing"></div>
+        <div class="orb" id="orb" style="--phase-color: var(--muted)">
+          <div class="orb-icon">
+            <!-- mic SVG -->
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 2a3 3 0 0 1 3 3v7a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3z"/>
+              <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+              <line x1="12" y1="19" x2="12" y2="23"/>
+              <line x1="8"  y1="23" x2="16" y2="23"/>
+            </svg>
+          </div>
+        </div>
+      </div>
+
+      <div class="waves" id="waves">
+        <span></span><span></span><span></span><span></span><span></span>
+      </div>
+    </div>
+
+    <!-- Status card -->
+    <div class="status-card">
+      <div class="status-row">
+        <div class="phase-badge" id="phaseBadge">OFFLINE</div>
+        <div class="status-msg"  id="statusMsg">Waiting for AC to start…</div>
+      </div>
+
+      <div class="timeout-wrap" id="timeoutWrap">
+        <div class="timeout-label">
+          <span>Listening window</span>
+          <span id="timeoutSecs">10s</span>
+        </div>
+        <div class="timeout-track">
+          <div class="timeout-fill" id="timeoutFill"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Command history -->
+    <div>
+      <div class="section-label">Command History</div>
+      <div class="history-list" id="historyList">
+        <div class="empty-state">
+          <div class="empty-icon">🎙</div>
+          No commands yet — say "Hey AC" to begin
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <footer>
+    <div>Say "Hey AC" to wake · 10s window</div>
+    <div class="footer-commands">
+      <span class="cmd-chip">open [site/app]</span>
+      <span class="cmd-chip">create file [name]</span>
+      <span class="cmd-chip">diary [entry]</span>
+      <span class="cmd-chip">what time is it</span>
+      <span class="cmd-chip">what's the weather</span>
+    </div>
+  </footer>
+
+</div>
+
+<script>
+/* ── Config ──────────────────────────────────────────────────── */
+const POLL_MS = 600;  // how often we ask the server for updates
+
+const PHASE_COLORS = {
+  idle:       'var(--muted)',
+  waiting:    'var(--yellow)',
+  listening:  'var(--accent)',
+  processing: 'var(--accent2)',
+  error:      'var(--red)',
+};
+
+const PHASE_LABELS = {
+  idle:       'IDLE',
+  waiting:    'WAITING',
+  listening:  'LISTENING',
+  processing: 'PROCESSING',
+  error:      'ERROR',
+};
+
+/* ── State ───────────────────────────────────────────────────── */
+let lastPhase     = null;
+let lastMsg       = null;
+let lastHistLen   = 0;
+let listenStart   = null;
+let connected     = false;
+let timerRAF      = null;
+
+/* ── DOM refs ────────────────────────────────────────────────── */
+const orb         = document.getElementById('orb');
+const orbRing     = document.getElementById('orbRing');
+const waves       = document.getElementById('waves');
+const phaseBadge  = document.getElementById('phaseBadge');
+const statusMsg   = document.getElementById('statusMsg');
+const timeoutWrap = document.getElementById('timeoutWrap');
+const timeoutFill = document.getElementById('timeoutFill');
+const timeoutSecs = document.getElementById('timeoutSecs');
+const historyList = document.getElementById('historyList');
+const connDot     = document.getElementById('connDot');
+
+/* ── Apply phase visuals ─────────────────────────────────────── */
+function applyPhase(phase, msg) {
+  const color = PHASE_COLORS[phase] || PHASE_COLORS.idle;
+  const label = PHASE_LABELS[phase] || phase.toUpperCase();
+
+  orb.style.setProperty('--phase-color', color);
+  waves.style.setProperty('--phase-color', color);
+  timeoutFill.style.setProperty('--phase-color', color);
+
+  phaseBadge.textContent = label;
+  phaseBadge.style.setProperty('--phase-color', color);
+
+  statusMsg.textContent = msg;
+
+  const isListening = phase === 'listening';
+  waves.classList.toggle('active', isListening);
+  orbRing.classList.toggle('active', isListening || phase === 'processing');
+
+  // Timeout bar: only show during listening
+  if (isListening) {
+    if (lastPhase !== 'listening') {
+      listenStart = Date.now();
+      startTimer();
+    }
+    timeoutWrap.classList.add('active');
+  } else {
+    timeoutWrap.classList.remove('active');
+    if (timerRAF) { cancelAnimationFrame(timerRAF); timerRAF = null; }
+  }
+
+  lastPhase = phase;
+  lastMsg   = msg;
+}
+
+/* ── Timer bar animation ─────────────────────────────────────── */
+function startTimer() {
+  const TOTAL = 10000; // 10 s
+  if (timerRAF) cancelAnimationFrame(timerRAF);
+
+  function tick() {
+    const elapsed = Date.now() - listenStart;
+    const frac    = Math.max(0, 1 - elapsed / TOTAL);
+    const secsLeft = Math.ceil(frac * 10);
+
+    timeoutFill.style.width = (frac * 100) + '%';
+    timeoutSecs.textContent = secsLeft + 's';
+    timeoutFill.classList.toggle('urgent', frac < 0.3);
+
+    if (frac > 0) {
+      timerRAF = requestAnimationFrame(tick);
+    }
+  }
+  timerRAF = requestAnimationFrame(tick);
+}
+
+/* ── Render history ──────────────────────────────────────────── */
+function renderHistory(items) {
+  if (!items || items.length === 0) return;
+
+  historyList.innerHTML = '';
+  items.forEach(item => {
+    const el = document.createElement('div');
+    el.className = 'history-item';
+    el.innerHTML = `
+      <div class="hist-icon ${item.ok ? 'ok' : 'fail'}">${item.ok ? '✓' : '✕'}</div>
+      <div class="hist-body">
+        <div class="hist-cmd">${escHtml(item.command)}</div>
+        <div class="hist-resp">${escHtml(item.response)}</div>
+        <div class="hist-time">${item.ts}</div>
+      </div>`;
+    historyList.appendChild(el);
+  });
+}
+
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+/* ── Poll status ─────────────────────────────────────────────── */
+async function pollStatus() {
+  try {
+    const res = await fetch('/api/status');
+    if (!res.ok) throw new Error('bad response');
+    const data = await res.json();
+
+    if (!connected) {
+      connected = true;
+      connDot.classList.add('online');
+    }
+
+    if (data.phase !== lastPhase || data.message !== lastMsg) {
+      applyPhase(data.phase, data.message);
+    }
+
+  } catch {
+    if (connected) {
+      connected = false;
+      connDot.classList.remove('online');
+      applyPhase('error', 'Cannot reach AC server — is main.py running?');
+    }
+  }
+}
+
+/* ── Poll history ────────────────────────────────────────────── */
+async function pollHistory() {
+  try {
+    const res = await fetch('/api/history');
+    if (!res.ok) return;
+    const data = await res.json();
+    if (data.length !== lastHistLen) {
+      lastHistLen = data.length;
+      renderHistory(data);
+    }
+  } catch { /* silent */ }
+}
+
+/* ── Boot ────────────────────────────────────────────────────── */
+(async function boot() {
+  // initial paint
+  applyPhase('idle', 'Waiting for AC to start…');
+
+  setInterval(pollStatus,  POLL_MS);
+  setInterval(pollHistory, POLL_MS * 2);
+
+  pollStatus();
+  pollHistory();
+})();
+</script>
+</body>
+</html>

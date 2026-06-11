@@ -1,0 +1,22 @@
+# Python
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.env
+
+# Logs & runtime data
+logs/
+data/Diary.txt
+data/*.txt
+
+# Secrets / config overrides
+config.local.json
+
+# OS
+.DS_Store
+Thumbs.db
+
+# VS Code
+.vscode/
