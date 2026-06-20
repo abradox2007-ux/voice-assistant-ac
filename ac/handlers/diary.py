@@ -21,3 +21,17 @@ def append_diary_entry(text: str) -> str:
         f.write(entry)
 
     return "Added to your diary."
+
+
+def open_diary() -> str:
+    """Open the diary file in the default text viewer. Returns spoken response."""
+    import os
+    if not DIARY_PATH.exists():
+        DIARY_PATH.parent.mkdir(exist_ok=True)
+        with open(DIARY_PATH, "w", encoding="utf-8") as f:
+            f.write("=== My Voice Assistant Diary ===\n")
+    try:
+        os.startfile(str(DIARY_PATH))
+        return "Opening your diary."
+    except Exception as exc:
+        return f"Couldn't open the diary file: {exc}"

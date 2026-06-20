@@ -55,6 +55,17 @@ class RouterTests(unittest.TestCase):
             mock.assert_called_once_with("a third entry")
             self.assertEqual(result_period, "Added to your diary.")
 
+    def test_open_diary(self) -> None:
+        with patch("ac.handlers.diary.open_diary", return_value="Opening your diary.") as mock:
+            result_read = self.router.route("read diary")
+            mock.assert_called_once()
+            self.assertEqual(result_read, "Opening your diary.")
+
+            mock.reset_mock()
+            result_watch = self.router.route("watch the content of the diary")
+            mock.assert_called_once()
+            self.assertEqual(result_watch, "Opening your diary.")
+
     def test_time_query(self) -> None:
         result = self.router.route("what time is it")
         self.assertIn("time is", result.lower())

@@ -13,7 +13,7 @@ HELP_TEXT = (
     "Here are some things you can say: "
     "Open Google, Open YouTube, Open Notepad, "
     "Open notes, Create file todos, "
-    "Diary I had a great day, "
+    "Diary I had a great day, Read diary, "
     "What time is it, What's the date, What's the weather."
 )
 
@@ -39,6 +39,14 @@ class CommandRouter:
         # ── Help ─────────────────────────────────────────────────────────────
         if cmd in ("help", "what can you do", "commands"):
             return HELP_TEXT
+
+        # ── View/Read/Watch Diary ────────────────────────────────────────────
+        if any(p in cmd for p in (
+            "read diary", "show diary", "view diary", "open diary", "watch diary",
+            "read the diary", "show the diary", "view the diary", "open the diary", "watch the diary",
+            "watch the content of the diary", "show the content of the diary", "read the content of the diary"
+        )):
+            return diary.open_diary()
 
         # ── Diary (must come before "open" check) ────────────────────────────
         diary_match = re.match(r"^diary\b\s*[,.:|-]?\s*(.*)$", cmd)
