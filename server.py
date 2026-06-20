@@ -51,6 +51,57 @@ def api_history():
         return jsonify(list(_history))
 
 
+# ── Diary APIs ────────────────────────────────────────────────────────────────
+
+@app.route("/api/diary", methods=["GET"])
+def api_get_diary():
+    from ac.handlers import diary
+    return jsonify(diary.get_diary_entries())
+
+
+@app.route("/api/diary/write", methods=["POST"])
+def api_write_diary():
+    from flask import request
+    from ac.handlers import diary
+    data = request.json or {}
+    text = data.get("text", "")
+    response = diary.append_diary_entry(text)
+    return jsonify({"success": True, "message": response})
+
+
+@app.route("/api/diary/overwrite", methods=["POST"])
+def api_overwrite_diary():
+    from flask import request
+    from ac.handlers import diary
+    data = request.json or {}
+    try:
+        index = int(data.get("index", -1))
+    except (ValueError, TypeError):
+        index = -1
+    text = data.get("text", "")
+    success = diary.update_entry(index, text)
+    return jsonify({"success": success})
+
+
+@app.route("/api/diary/delete", methods=["POST"])
+def api_delete_diary():
+    from flask import request
+    from ac.handlers import diary
+    data = request.json or {}
+    try:
+        index = int(data.get("index", -1))
+    except (ValueError, TypeError):
+        index = -1
+    success = diary.delete_entry(index)
+    return jsonify({"success": success})
+
+
+@app.route("/api/status/reset", methods=["POST"])
+def api_status_reset():
+    set_status("idle", "AC is ready.")
+    return jsonify({"success": True})
+
+
 # ── Serve the frontend ────────────────────────────────────────────────────────
 
 @app.route("/")

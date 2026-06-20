@@ -48,6 +48,12 @@ class CommandRouter:
         )):
             return diary.open_diary()
 
+        # ── Diary Manual Panel ───────────────────────────────────────────────
+        if cmd in ("diary manual", "manual diary"):
+            from server import set_status
+            set_status("diary_manual", "Opening manual diary panel...")
+            return "Opening manual diary panel."
+
         # ── Diary (must come before "open" check) ────────────────────────────
         diary_match = re.match(r"^diary\b\s*[,.:|-]?\s*(.*)$", cmd)
         if diary_match:

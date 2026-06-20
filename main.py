@@ -111,7 +111,8 @@ def main() -> None:
                 response = router.route(command)
                 speak(response)
                 add_history(command, response, ok=True)
-                set_status("idle", f'Done: {response[:60]}{"…" if len(response) > 60 else ""}')
+                if response != "Opening manual diary panel.":
+                    set_status("idle", f'Done: {response[:60]}{"…" if len(response) > 60 else ""}')
 
                 network_error_spoken = False
                 mic_error_spoken = False

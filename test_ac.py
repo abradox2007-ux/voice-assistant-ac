@@ -66,6 +66,12 @@ class RouterTests(unittest.TestCase):
             mock.assert_called_once()
             self.assertEqual(result_watch, "Opening your diary.")
 
+    def test_diary_manual(self) -> None:
+        with patch("server.set_status") as mock_status:
+            result = self.router.route("diary manual")
+            mock_status.assert_called_once_with("diary_manual", "Opening manual diary panel...")
+            self.assertEqual(result, "Opening manual diary panel.")
+
     def test_time_query(self) -> None:
         result = self.router.route("what time is it")
         self.assertIn("time is", result.lower())
@@ -154,6 +160,40 @@ class ListenerTests(unittest.TestCase):
 
         cmd = Listener.extract_command_from_wake("hey AC open youtube")
         self.assertEqual(cmd, "open youtube")
+
+
+class DiaryTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.tmp_dir = tempfile.TemporaryDirectory()
+        self.diary_path = Path(self.tmp_dir.name) / "Diary.txt"
+        self.patcher = patch("ac.handlers.diary.DIARY_PATH", self.diary_path)
+        self.patcher.start()
+        
+    def tearDown(self) -> None:
+        self.patcher.stop()
+        self.tmp_dir.cleanup()
+        
+    def test_crud_operations(self) -> None:
+        from ac.handlers.diary import append_diary_entry, get_diary_entries, update_entry, delete_entry
+        
+        self.assertEqual(get_diary_entries(), [])
+        
+        append_diary_entry("First entry")
+        append_diary_entry("Second entry")
+        
+        entries = get_diary_entries()
+        self.assertEqual(len(entries), 2)
+        self.assertEqual(entries[0]["text"], "First entry")
+        self.assertEqual(entries[1]["text"], "Second entry")
+        
+        update_entry(0, "Modified first entry")
+        entries = get_diary_entries()
+        self.assertEqual(entries[0]["text"], "Modified first entry")
+        
+        delete_entry(0)
+        entries = get_diary_entries()
+        self.assertEqual(len(entries), 1)
+        self.assertEqual(entries[0]["text"], "Second entry")
 
 
 if __name__ == "__main__":

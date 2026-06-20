@@ -35,3 +35,59 @@ def open_diary() -> str:
         return "Opening your diary."
     except Exception as exc:
         return f"Couldn't open the diary file: {exc}"
+
+
+def get_diary_entries() -> list[dict[str, str | int]]:
+    """Parse Diary.txt and return a list of entries with index, timestamp, and text."""
+    if not DIARY_PATH.exists():
+        return []
+    
+    with open(DIARY_PATH, "r", encoding="utf-8") as f:
+        content = f.read()
+        
+    import re
+    # Entries start with [YYYY-MM-DD HH:MM:SS]
+    pattern = r"\[(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\]\n(.*?)(?=\n\[\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\]|\Z)"
+    matches = re.finditer(pattern, content, re.DOTALL)
+    
+    entries = []
+    for idx, match in enumerate(matches):
+        timestamp = match.group(1)
+        text = match.group(2).strip()
+        entries.append({
+            "index": idx,
+            "timestamp": timestamp,
+            "text": text
+        })
+    return entries
+
+
+def save_diary_entries(entries: list[dict]) -> None:
+    """Save the list of entries back to Diary.txt."""
+    DIARY_PATH.parent.mkdir(exist_ok=True)
+    with open(DIARY_PATH, "w", encoding="utf-8") as f:
+        f.write("=== My Voice Assistant Diary ===\n")
+        for entry in entries:
+            timestamp = entry["timestamp"]
+            text = entry["text"].strip()
+            f.write(f"\n[{timestamp}]\n{text}\n")
+
+
+def update_entry(index: int, text: str) -> bool:
+    """Update entry at index with new text."""
+    entries = get_diary_entries()
+    if 0 <= index < len(entries):
+        entries[index]["text"] = text.strip()
+        save_diary_entries(entries)
+        return True
+    return False
+
+
+def delete_entry(index: int) -> bool:
+    """Delete entry at index."""
+    entries = get_diary_entries()
+    if 0 <= index < len(entries):
+        entries.pop(index)
+        save_diary_entries(entries)
+        return True
+    return False
