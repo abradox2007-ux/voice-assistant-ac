@@ -30,6 +30,7 @@ class CommandRouter:
     def route(self, command: str) -> str:
         """Dispatch *command* to the appropriate handler and return a response."""
         cmd = command.strip().lower()
+        cmd = cmd.replace("dairy", "diary")
         logger.debug("Routing command: %s", cmd)
 
         # ── Safety: no delete ────────────────────────────────────────────────

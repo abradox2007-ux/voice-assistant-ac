@@ -72,6 +72,11 @@ class RouterTests(unittest.TestCase):
             mock_status.assert_called_once_with("diary_manual", "Opening manual diary panel...")
             self.assertEqual(result, "Opening manual diary panel.")
 
+            mock_status.reset_mock()
+            result_homophone = self.router.route("Dairy manual")
+            mock_status.assert_called_once_with("diary_manual", "Opening manual diary panel...")
+            self.assertEqual(result_homophone, "Opening manual diary panel.")
+
     def test_time_query(self) -> None:
         result = self.router.route("what time is it")
         self.assertIn("time is", result.lower())
