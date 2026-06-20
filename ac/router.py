@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import re
 
 from ac.handlers import apps, diary, files, info, urls
 
@@ -40,8 +41,9 @@ class CommandRouter:
             return HELP_TEXT
 
         # ── Diary (must come before "open" check) ────────────────────────────
-        if cmd.startswith("diary "):
-            entry_text = command[len("diary "):].strip()
+        diary_match = re.match(r"^diary\b\s*[,.:|-]?\s*(.*)$", cmd)
+        if diary_match:
+            entry_text = command[len(command) - len(diary_match.group(1)):].strip()
             return diary.append_diary_entry(entry_text)
 
         # ── Time ─────────────────────────────────────────────────────────────

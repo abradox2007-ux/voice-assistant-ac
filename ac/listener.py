@@ -22,6 +22,7 @@ class Listener:
         self._recognizer = sr.Recognizer()
         self._recognizer.pause_threshold = 0.8
         self._recognizer.dynamic_energy_threshold = True
+        self._ambient_adjusted = False
         self._on_network_error = on_network_error or (lambda: None)
         self._on_mic_error = on_mic_error or (lambda: None)
 
@@ -94,7 +95,10 @@ class Listener:
         while True:
             try:
                 with mic as source:
-                    self._recognizer.adjust_for_ambient_noise(source, duration=0.5)
+                    if not self._ambient_adjusted:
+                        logger.info("Adjusting for ambient noise...")
+                        self._recognizer.adjust_for_ambient_noise(source, duration=1.0)
+                        self._ambient_adjusted = True
                     audio = self._recognizer.listen(source, timeout=5, phrase_time_limit=8)
             except sr.WaitTimeoutError:
                 continue
@@ -128,7 +132,10 @@ class Listener:
 
         try:
             with mic as source:
-                self._recognizer.adjust_for_ambient_noise(source, duration=0.3)
+                if not self._ambient_adjusted:
+                    logger.info("Adjusting for ambient noise...")
+                    self._recognizer.adjust_for_ambient_noise(source, duration=1.0)
+                    self._ambient_adjusted = True
                 try:
                     audio = self._recognizer.listen(
                         source,

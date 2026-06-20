@@ -28,6 +28,33 @@ class RouterTests(unittest.TestCase):
             mock.assert_called_once_with("open google was fun")
             self.assertEqual(result, "Added to your diary.")
 
+    def test_diary_empty(self) -> None:
+        with patch("ac.handlers.diary.append_diary_entry", return_value="What would you like to add to your diary?") as mock:
+            result = self.router.route("diary")
+            mock.assert_called_once_with("")
+            self.assertEqual(result, "What would you like to add to your diary?")
+            
+            mock.reset_mock()
+            result_spaces = self.router.route("diary   ")
+            mock.assert_called_once_with("")
+            self.assertEqual(result_spaces, "What would you like to add to your diary?")
+
+    def test_diary_with_punctuation(self) -> None:
+        with patch("ac.handlers.diary.append_diary_entry", return_value="Added to your diary.") as mock:
+            result_comma = self.router.route("diary, I had a great day")
+            mock.assert_called_once_with("I had a great day")
+            self.assertEqual(result_comma, "Added to your diary.")
+
+            mock.reset_mock()
+            result_colon = self.router.route("diary: another entry")
+            mock.assert_called_once_with("another entry")
+            self.assertEqual(result_colon, "Added to your diary.")
+
+            mock.reset_mock()
+            result_period = self.router.route("diary. a third entry")
+            mock.assert_called_once_with("a third entry")
+            self.assertEqual(result_period, "Added to your diary.")
+
     def test_time_query(self) -> None:
         result = self.router.route("what time is it")
         self.assertIn("time is", result.lower())
