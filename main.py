@@ -69,6 +69,11 @@ def main() -> None:
     try:
         while True:
             try:
+                # ── Phase 0: Wait if in manual diary mode ────────────────
+                from server import get_status_phase
+                while get_status_phase() == "diary_manual":
+                    time.sleep(0.2)
+
                 # ── Phase 1: Wait for wake word ──────────────────────────
                 set_status("waiting", "Waiting for wake word... say \"Hey AC\"")
                 _, inline_command = listener.wait_for_wake_word()

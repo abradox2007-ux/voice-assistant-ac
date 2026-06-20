@@ -27,6 +27,12 @@ def set_status(phase: str, message: str) -> None:
         _state["updated_at"] = time.time()
 
 
+def get_status_phase() -> str:
+    with _lock:
+        return _state["phase"]
+
+
+
 def add_history(command: str, response: str, ok: bool = True) -> None:
     with _lock:
         _history.appendleft({
