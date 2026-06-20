@@ -669,10 +669,12 @@ function applyPhase(phase, msg) {
   const isDiaryManual = phase === 'diary_manual';
   const modal = document.getElementById('diaryModal');
   if (modal) {
-    const wasActive = modal.classList.contains('active');
-    modal.classList.toggle('active', isDiaryManual);
-    if (isDiaryManual && !wasActive) {
-      switchDiaryTab('write');
+    if (isDiaryManual) {
+      const wasActive = modal.classList.contains('active');
+      modal.classList.add('active');
+      if (!wasActive) {
+        switchDiaryTab('write');
+      }
     }
   }
 
