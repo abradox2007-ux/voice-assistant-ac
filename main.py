@@ -1,4 +1,4 @@
-"""Voice Assistant AJ — entry point with frontend server integration."""
+"""Voice Assistant AC — entry point with frontend server integration."""
 
 from __future__ import annotations
 
@@ -24,7 +24,7 @@ def run_flask():
 
 def main() -> None:
     logger = setup_logging()
-    logger.info("Starting Voice Assistant AJ")
+    logger.info("Starting Voice Assistant AC")
 
     try:
         config = load_config()
@@ -62,7 +62,7 @@ def main() -> None:
         on_mic_error=on_mic_error,
     )
 
-    greeting = "AJ is ready. Say hey AJ followed by your command."
+    greeting = "AC is ready. Say hey AC followed by your command."
     speak(greeting)
     set_status("idle", greeting)
 
@@ -70,7 +70,7 @@ def main() -> None:
         while True:
             try:
                 # ── Phase 1: Wait for wake word ──────────────────────────
-                set_status("waiting", "Waiting for wake word... say \"Hey AJ\"")
+                set_status("waiting", "Waiting for wake word... say \"Hey AC\"")
                 _, inline_command = listener.wait_for_wake_word()
 
                 speak("Yes?")
@@ -101,7 +101,7 @@ def main() -> None:
                     set_status("waiting", timeout_msg)
                     add_history("(timeout)", timeout_msg, ok=False)
                     time.sleep(0.5)
-                    restart_msg = 'Tell your command by saying "Hey AJ" and your command.'
+                    restart_msg = 'Tell your command by saying "Hey AC" and your command.'
                     speak(restart_msg)
                     set_status("idle", restart_msg)
                     continue
@@ -128,7 +128,7 @@ def main() -> None:
     except KeyboardInterrupt:
         logger.info("Shutting down on user interrupt.")
         speak("Goodbye.")
-        set_status("idle", "AJ is offline.")
+        set_status("idle", "AC is offline.")
     finally:
         shutdown_speech()
 

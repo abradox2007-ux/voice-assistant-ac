@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>AJ — Voice Assistant</title>
+<title>AC — Voice Assistant</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
 <style>
@@ -359,7 +359,7 @@
 <div class="app">
 
   <header>
-    <div class="logo-mark">AJ</div>
+    <div class="logo-mark">AC</div>
     <div class="brand">Voice Assistant <span>v1.0</span></div>
     <div class="conn-dot" id="connDot"></div>
   </header>
@@ -392,7 +392,7 @@
     <div class="status-card">
       <div class="status-row">
         <div class="phase-badge" id="phaseBadge">OFFLINE</div>
-        <div class="status-msg"  id="statusMsg">Waiting for AJ to start…</div>
+        <div class="status-msg"  id="statusMsg">Waiting for AC to start…</div>
       </div>
 
       <div class="timeout-wrap" id="timeoutWrap">
@@ -412,7 +412,7 @@
       <div class="history-list" id="historyList">
         <div class="empty-state">
           <div class="empty-icon">🎙</div>
-          No commands yet — say "Hey AJ" to begin
+          No commands yet — say "Hey AC" to begin
         </div>
       </div>
     </div>
@@ -420,7 +420,7 @@
   </main>
 
   <footer>
-    <div>Say "Hey AJ" to wake · 10s window</div>
+    <div>Say "Hey AC" to wake · 10s window</div>
     <div class="footer-commands">
       <span class="cmd-chip">open [site/app]</span>
       <span class="cmd-chip">create file [name]</span>
@@ -570,7 +570,7 @@ async function pollStatus() {
     if (connected) {
       connected = false;
       connDot.classList.remove('online');
-      applyPhase('error', 'Cannot reach AJ server — is main.py running?');
+      applyPhase('error', 'Cannot reach AC server — is main.py running?');
     }
   }
 }
@@ -591,7 +591,7 @@ async function pollHistory() {
 /* ── Boot ────────────────────────────────────────────────────── */
 (async function boot() {
   // initial paint
-  applyPhase('idle', 'Waiting for AJ to start…');
+  applyPhase('idle', 'Waiting for AC to start…');
 
   setInterval(pollStatus,  POLL_MS);
   setInterval(pollHistory, POLL_MS * 2);

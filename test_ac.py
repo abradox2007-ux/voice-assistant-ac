@@ -1,4 +1,4 @@
-"""Automated tests for AJ command routing and handlers (no microphone)."""
+"""Automated tests for AC command routing and handlers (no microphone)."""
 
 from __future__ import annotations
 
@@ -107,14 +107,14 @@ class ListenerTests(unittest.TestCase):
     def test_wake_word_detection(self) -> None:
         from ac.listener import Listener
 
-        self.assertTrue(Listener.contains_wake_word("hey AJ open google"))
-        self.assertTrue(Listener.contains_wake_word("Hey A J diary test"))
+        self.assertTrue(Listener.contains_wake_word("hey AC open google"))
+        self.assertTrue(Listener.contains_wake_word("Hey A C diary test"))
         self.assertFalse(Listener.contains_wake_word("hello open google"))
 
     def test_extract_inline_command(self) -> None:
         from ac.listener import Listener
 
-        cmd = Listener.extract_command_from_wake("hey AJ open youtube")
+        cmd = Listener.extract_command_from_wake("hey AC open youtube")
         self.assertEqual(cmd, "open youtube")
 
 
