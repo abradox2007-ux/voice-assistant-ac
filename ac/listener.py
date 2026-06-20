@@ -10,7 +10,7 @@ import speech_recognition as sr
 
 logger = logging.getLogger(__name__)
 
-WAKE_WORDS = ["hey ac", "hey a c", "hey, ac", "hey,ac"]
+WAKE_WORDS = ["hey aj", "hey a j", "hey, aj", "hey,aj"]
 
 
 class Listener:
@@ -34,12 +34,12 @@ class Listener:
         for ww in WAKE_WORDS:
             if ww in t:
                 return True
-        # Fuzzy: "hey" followed by "ac" within 2 tokens
+        # Fuzzy: "hey" followed by "aj" within 2 tokens
         tokens = re.split(r"\s+", t)
         for i, tok in enumerate(tokens):
             if tok in ("hey", "hay", "hi") and i + 1 < len(tokens):
                 nxt = tokens[i + 1].replace(",", "").replace(".", "")
-                if nxt in ("ac", "a.c", "a-c"):
+                if nxt in ("aj", "a.j", "a-j"):
                     return True
         return False
 
@@ -56,7 +56,7 @@ class Listener:
         for i, tok in enumerate(tokens):
             if tok in ("hey", "hay", "hi") and i + 1 < len(tokens):
                 nxt = tokens[i + 1].replace(",", "")
-                if nxt in ("ac", "a.c", "a-c"):
+                if nxt in ("aj", "a.j", "a-j"):
                     return " ".join(tokens[i + 2:]).strip()
         return t
 
