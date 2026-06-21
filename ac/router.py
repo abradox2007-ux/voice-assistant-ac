@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import logging
+import os
 import re
 
-from ac.handlers import apps, diary, files, info, urls
+from ac.handlers import apps, diary, files, info, urls, ai
 
 logger = logging.getLogger(__name__)
 
@@ -61,22 +62,63 @@ class CommandRouter:
             entry_text = command[len(command) - len(diary_match.group(1)):].strip()
             return diary.append_diary_entry(entry_text)
 
-        # ── Time ─────────────────────────────────────────────────────────────
-        if any(p in cmd for p in ("what time", "current time", "tell me the time")):
-            return info.tell_time()
-
-        # ── Date ─────────────────────────────────────────────────────────────
-        if any(p in cmd for p in ("what's the date", "what is the date", "today's date", "current date")):
-            return info.tell_date()
-
         # ── Weather ──────────────────────────────────────────────────────────
         if "weather" in cmd:
             return info.tell_weather(self._weather_city, self._weather_country)
+
+        # ── Time ─────────────────────────────────────────────────────────────
+        if any(p in cmd for p in ("time", "clock")):
+            return info.tell_time()
+
+        # ── Date ─────────────────────────────────────────────────────────────
+        if any(p in cmd for p in ("date", "today")):
+            return info.tell_date()
 
         # ── Create file ──────────────────────────────────────────────────────
         if cmd.startswith("create file "):
             name = command[len("create file "):].strip()
             return files.create_file(name)
+
+        # ── Search ───────────────────────────────────────────────────────────
+        if cmd == "search" or cmd.startswith("search "):
+            query = command[len("search "):].strip()
+            if query:
+                import urllib.parse
+                import webbrowser
+                url = f"https://www.google.com/search?q={urllib.parse.quote(query)}"
+                webbrowser.open(url)
+                return f"Searching for '{query}' on Google."
+            else:
+                return "What would you like me to search for?"
+
+        # ── Play ─────────────────────────────────────────────────────────────
+        if cmd == "play" or cmd.startswith("play "):
+            song = command[len("play "):].strip()
+            if song:
+                import urllib.parse
+                import webbrowser
+                import requests
+
+                try:
+                    search_url = f"https://www.youtube.com/results?search_query={urllib.parse.quote(song)}"
+                    headers = {
+                        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+                    }
+                    html = requests.get(search_url, headers=headers, timeout=5).text
+                    video_ids = re.findall(r"watch\?v=(\S{11})", html)
+                    if video_ids:
+                        url = f"https://www.youtube.com/watch?v={video_ids[0]}"
+                        webbrowser.open(url)
+                        return f"Playing '{song}' on YouTube."
+                except Exception:
+                    pass
+
+                # Fallback to search results page if scraping fails
+                url = f"https://www.youtube.com/results?search_query={urllib.parse.quote(song)}"
+                webbrowser.open(url)
+                return f"Playing '{song}' on YouTube."
+            else:
+                return "What song would you like me to play?"
 
         # ── Open ─────────────────────────────────────────────────────────────
         if cmd.startswith("open "):
@@ -103,5 +145,9 @@ class CommandRouter:
             # Last resort: try as URL
             return urls.open_url(target, self._url_aliases)
 
-        # ── Unknown ──────────────────────────────────────────────────────────
+        # ── Unknown / AI Fallback ────────────────────────────────────────────
+        api_key = self._config.get("gemini_api_key") or os.environ.get("GEMINI_API_KEY")
+        if api_key:
+            return ai.generate_voice_response(command, api_key)
+
         return f"Sorry, I didn't understand '{command}'. Say 'help' for a list of commands."

@@ -20,7 +20,7 @@ class Listener:
         on_mic_error: Callable[[], None] | None = None,
     ) -> None:
         self._recognizer = sr.Recognizer()
-        self._recognizer.pause_threshold = 0.8
+        self._recognizer.pause_threshold = 1.2
         self._recognizer.dynamic_energy_threshold = True
         self._ambient_adjusted = False
         self._on_network_error = on_network_error or (lambda: None)
@@ -117,7 +117,7 @@ class Listener:
     def capture_command(
         self,
         inline_command: str | None = None,
-        timeout: int = 10,
+        timeout: int = 15,
     ) -> str | None:
         """
         Capture and return one spoken command (or return *inline_command* immediately).
@@ -140,7 +140,7 @@ class Listener:
                     audio = self._recognizer.listen(
                         source,
                         timeout=timeout,
-                        phrase_time_limit=timeout,
+                        phrase_time_limit=None,
                     )
                 except sr.WaitTimeoutError:
                     return None

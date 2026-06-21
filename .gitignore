@@ -12,6 +12,7 @@ data/Diary.txt
 data/*.txt
 
 # Secrets / config overrides
+config.json
 config.local.json
 
 # OS

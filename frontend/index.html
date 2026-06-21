@@ -107,6 +107,49 @@
     width: 140px; height: 140px;
   }
 
+  /* Wave ripples radiating from behind the microphone orb */
+  .orb-wrap::before,
+  .orb-wrap::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    background: var(--phase-color, var(--accent));
+    opacity: 0;
+    z-index: -1;
+    transition: transform 0.4s, opacity 0.4s, background 0.4s;
+    pointer-events: none;
+  }
+
+  /* Listening state: smooth continuous waves */
+  .orb-wrap.listening::before {
+    animation: ripple 2.2s cubic-bezier(0.25, 0.8, 0.25, 1) infinite;
+  }
+  .orb-wrap.listening::after {
+    animation: ripple 2.2s cubic-bezier(0.25, 0.8, 0.25, 1) infinite;
+    animation-delay: 1.1s;
+  }
+
+  /* Processing state: faster, dynamic pulses */
+  .orb-wrap.processing::before {
+    animation: ripple 1.2s cubic-bezier(0.25, 0.8, 0.25, 1) infinite;
+  }
+  .orb-wrap.processing::after {
+    animation: ripple 1.2s cubic-bezier(0.25, 0.8, 0.25, 1) infinite;
+    animation-delay: 0.6s;
+  }
+
+  @keyframes ripple {
+    0% {
+      transform: scale(1);
+      opacity: 0.6;
+    }
+    100% {
+      transform: scale(1.7);
+      opacity: 0;
+    }
+  }
+
   /* Outer ring pulse — only during listening */
   .orb-ring {
     position: absolute; inset: -16px;
@@ -171,6 +214,41 @@
   @keyframes wave {
     0%, 100% { transform: scaleY(0.4); }
     50%       { transform: scaleY(1); }
+  }
+
+  /* ── Transcript box ────────────────────────────────────────── */
+  .transcript-box {
+    background: rgba(108, 141, 250, 0.04);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 16px 20px;
+    display: none;
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 8px;
+    transition: all 0.3s ease;
+  }
+  .transcript-box.active {
+    display: flex;
+    animation: fadeIn 0.4s ease;
+  }
+  .transcript-label {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    color: var(--accent);
+  }
+  .transcript-text {
+    font-size: 17px;
+    font-weight: 500;
+    color: var(--text);
+    line-height: 1.4;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-4px); }
+    to   { opacity: 1; transform: translateY(0); }
   }
 
   /* ── Status card ──────────────────────────────────────────── */
@@ -483,7 +561,7 @@
 
     <!-- Orb + waves -->
     <div class="orb-section">
-      <div class="orb-wrap">
+      <div class="orb-wrap" id="orbWrap">
         <div class="orb-ring" id="orbRing"></div>
         <div class="orb" id="orb" style="--phase-color: var(--muted)">
           <div class="orb-icon">
@@ -503,6 +581,12 @@
       </div>
     </div>
 
+    <!-- Transcript box (shows what the user said) -->
+    <div class="transcript-box" id="transcriptBox">
+      <div class="transcript-label">YOU SAID</div>
+      <div class="transcript-text" id="transcriptText"></div>
+    </div>
+
     <!-- Status card -->
     <div class="status-card">
       <div class="status-row">
@@ -513,7 +597,7 @@
       <div class="timeout-wrap" id="timeoutWrap">
         <div class="timeout-label">
           <span>Listening window</span>
-          <span id="timeoutSecs">10s</span>
+          <span id="timeoutSecs">15s</span>
         </div>
         <div class="timeout-track">
           <div class="timeout-fill" id="timeoutFill"></div>
@@ -535,7 +619,7 @@
   </main>
 
   <footer>
-    <div>Say "Hey AC" to wake · 10s window</div>
+    <div>Say "Hey AC" to wake · 15s window</div>
     <div class="footer-commands">
       <span class="cmd-chip">open [site/app]</span>
       <span class="cmd-chip">create file [name]</span>
@@ -638,10 +722,13 @@ let timerRAF      = null;
 
 /* ── DOM refs ────────────────────────────────────────────────── */
 const orb         = document.getElementById('orb');
+const orbWrap     = document.getElementById('orbWrap');
 const orbRing     = document.getElementById('orbRing');
 const waves       = document.getElementById('waves');
 const phaseBadge  = document.getElementById('phaseBadge');
 const statusMsg   = document.getElementById('statusMsg');
+const transcriptBox = document.getElementById('transcriptBox');
+const transcriptText = document.getElementById('transcriptText');
 const timeoutWrap = document.getElementById('timeoutWrap');
 const timeoutFill = document.getElementById('timeoutFill');
 const timeoutSecs = document.getElementById('timeoutSecs');
@@ -665,6 +752,19 @@ function applyPhase(phase, msg) {
   const isListening = phase === 'listening';
   waves.classList.toggle('active', isListening);
   orbRing.classList.toggle('active', isListening || phase === 'processing');
+  orbWrap.classList.toggle('listening', phase === 'listening');
+  orbWrap.classList.toggle('processing', phase === 'processing');
+
+  if (phase === 'processing' && msg.startsWith('Processing: "')) {
+    const match = msg.match(/^Processing: "(.*)"$/);
+    if (match && match[1]) {
+      transcriptText.textContent = match[1];
+      transcriptBox.classList.add('active');
+    }
+  } else if (phase === 'listening' || phase === 'waiting') {
+    transcriptBox.classList.remove('active');
+    transcriptText.textContent = '';
+  }
 
   const isDiaryManual = phase === 'diary_manual';
   const modal = document.getElementById('diaryModal');
@@ -696,13 +796,13 @@ function applyPhase(phase, msg) {
 
 /* ── Timer bar animation ─────────────────────────────────────── */
 function startTimer() {
-  const TOTAL = 10000; // 10 s
+  const TOTAL = 15000; // 15 s
   if (timerRAF) cancelAnimationFrame(timerRAF);
 
   function tick() {
     const elapsed = Date.now() - listenStart;
     const frac    = Math.max(0, 1 - elapsed / TOTAL);
-    const secsLeft = Math.ceil(frac * 10);
+    const secsLeft = Math.ceil(frac * 15);
 
     timeoutFill.style.width = (frac * 100) + '%';
     timeoutSecs.textContent = secsLeft + 's';

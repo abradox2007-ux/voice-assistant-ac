@@ -80,6 +80,8 @@ class RouterTests(unittest.TestCase):
     def test_time_query(self) -> None:
         result = self.router.route("what time is it")
         self.assertIn("time is", result.lower())
+        result2 = self.router.route("what's the time now")
+        self.assertIn("time is", result2.lower())
 
     def test_date_query(self) -> None:
         result = self.router.route("what's the date")
@@ -89,6 +91,8 @@ class RouterTests(unittest.TestCase):
         with patch("ac.handlers.info.tell_weather", return_value="The weather in Chennai is clear."):
             result = self.router.route("what's the weather")
             self.assertIn("weather", result.lower())
+            result2 = self.router.route("what's the weather today")
+            self.assertIn("weather", result2.lower())
 
     def test_create_file(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -130,6 +134,39 @@ class RouterTests(unittest.TestCase):
     def test_unknown_command(self) -> None:
         result = self.router.route("do something random xyz")
         self.assertIn("didn't understand", result.lower())
+
+    def test_search_command(self) -> None:
+        with patch("webbrowser.open") as mock_open:
+            result = self.router.route("search quantum computing")
+
+            mock_open.assert_called_once_with("https://www.google.com/search?q=quantum%20computing")
+            self.assertIn("Searching for 'quantum computing' on Google", result)
+
+        # Empty query
+        result_empty = self.router.route("search ")
+        self.assertEqual(result_empty, "What would you like me to search for?")
+
+    def test_play_command(self) -> None:
+        with patch("requests.get") as mock_get, patch("webbrowser.open") as mock_open:
+            mock_get.return_value.text = 'href="/watch?v=dQw4w9WgXcQ"'
+            result = self.router.route("play bohemian rhapsody")
+            mock_open.assert_called_once_with("https://www.youtube.com/watch?v=dQw4w9WgXcQ")
+            self.assertIn("Playing 'bohemian rhapsody' on YouTube", result)
+
+        # Empty query
+        result_empty = self.router.route("play ")
+        self.assertEqual(result_empty, "What song would you like me to play?")
+
+    def test_ai_fallback_configured(self) -> None:
+        custom_config = dict(self.config)
+        custom_config["gemini_api_key"] = "test-api-key"
+        custom_router = CommandRouter(custom_config)
+
+        with patch("ac.router.ai.generate_voice_response", return_value="Mocked Gemini response.") as mock_ai:
+            result = custom_router.route("why is the sky blue")
+            mock_ai.assert_called_once_with("why is the sky blue", "test-api-key")
+            self.assertEqual(result, "Mocked Gemini response.")
+
 
     def test_help_command(self) -> None:
         result = self.router.route("help")

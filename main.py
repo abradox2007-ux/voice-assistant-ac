@@ -14,7 +14,7 @@ from ac.utils import load_config, setup_logging
 from server import app as flask_app, set_status, add_history
 
 
-LISTEN_TIMEOUT = 10  # seconds to wait for a command before giving up
+LISTEN_TIMEOUT = 15  # seconds to wait for a command before giving up
 
 
 def run_flask():
@@ -81,7 +81,7 @@ def main() -> None:
                 speak("Yes?")
                 set_status("listening", "Listening... speak your command now")
 
-                # ── Phase 2: Capture command with 10s timeout ────────────
+                # ── Phase 2: Capture command with 15s timeout ────────────
                 command = None
                 deadline = time.time() + LISTEN_TIMEOUT
 
