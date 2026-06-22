@@ -35,7 +35,8 @@ def main() -> None:
     # Start Flask frontend server in background
     flask_thread = threading.Thread(target=run_flask, daemon=True)
     flask_thread.start()
-    logger.info("Frontend server started at http://localhost:5050")
+    logger.info("Frontend server started at http://localhost:5050")                 ##hoooooooooooo
+                                                                                    ##ha ha ha bankai zenponzakura kageyoshi
 
     router = CommandRouter(config)
     network_error_spoken = False
@@ -113,6 +114,7 @@ def main() -> None:
 
                 # ── Phase 4: Route the command ───────────────────────────
                 set_status("processing", f'Processing: "{command}"')
+                speak(command)
                 response = router.route(command)
                 speak(response)
                 add_history(command, response, ok=True)

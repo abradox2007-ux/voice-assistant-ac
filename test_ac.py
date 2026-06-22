@@ -132,8 +132,9 @@ class RouterTests(unittest.TestCase):
                 self.assertIn("Opening notes.txt", result)
 
     def test_unknown_command(self) -> None:
-        result = self.router.route("do something random xyz")
-        self.assertIn("didn't understand", result.lower())
+        with patch.dict(self.router._config, {"gemini_api_key": ""}):
+            result = self.router.route("do something random xyz")
+            self.assertIn("didn't understand", result.lower())
 
     def test_search_command(self) -> None:
         with patch("webbrowser.open") as mock_open:

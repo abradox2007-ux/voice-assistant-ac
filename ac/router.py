@@ -150,4 +150,7 @@ class CommandRouter:
         if api_key:
             return ai.generate_voice_response(command, api_key)
 
+        if any(w in cmd for w in ("why", "what", "how", "who", "where", "when", "tell me")):
+            return "To ask general questions, please configure your gemini_api_key in config.json."
+
         return f"Sorry, I didn't understand '{command}'. Say 'help' for a list of commands."

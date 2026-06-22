@@ -15,28 +15,35 @@ def generate_voice_response(prompt: str, api_key: str) -> str:
     if not api_key or not api_key.strip():
         return "I need a Gemini API key to answer general questions."
 
-    try:
-        from google import genai
-        from google.genai import types
+    from google import genai
+    from google.genai import types
 
-        client = genai.Client(api_key=api_key.strip())
-        response = client.models.generate_content(
-            model="gemini-2.5-flash",
-            contents=prompt,
-            config=types.GenerateContentConfig(
-                system_instruction=(
-                    "You are a helpful voice assistant named AC. "
-                    "Keep your responses short (under 2 sentences), natural-sounding, "
-                    "and easy to read aloud by a text-to-speech engine. "
-                    "Do not use markdown syntax, symbols, bullet points, or list formats."
-                ),
-                temperature=0.7,
-            ),
-        )
-        if response.text:
-            return response.text.strip()
-        return "I generated an empty response. Try asking again."
+    client = genai.Client(api_key=api_key.strip())
+    config = types.GenerateContentConfig(
+        system_instruction=(
+            "You are a helpful voice assistant named AC. "
+            "Keep your responses short (under 2 sentences), natural-sounding, "
+            "and easy to read aloud by a text-to-speech engine. "
+            "Do not use markdown syntax, symbols, bullet points, or list formats."
+        ),
+        temperature=0.7,
+    )
 
-    except Exception as exc:
-        logger.exception("Error calling Gemini API: %s", exc)
-        return "I had trouble connecting to my brain. Please check your internet connection or API key."
+    models = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"]
+    last_exc = None
+
+    for model in models:
+        try:
+            response = client.models.generate_content(
+                model=model,
+                contents=prompt,
+                config=config,
+            )
+            if response.text:
+                return response.text.strip()
+        except Exception as exc:
+            logger.warning("Failed calling Gemini API with model %s: %s", model, exc)
+            last_exc = exc
+
+    logger.exception("All Gemini models failed: %s", last_exc)
+    return "I had trouble connecting to my brain. Please check your internet connection or API key."
