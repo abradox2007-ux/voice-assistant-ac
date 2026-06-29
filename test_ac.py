@@ -239,5 +239,52 @@ class DiaryTests(unittest.TestCase):
         self.assertEqual(entries[0]["text"], "Second entry")
 
 
+class ServerTests(unittest.TestCase):
+    def setUp(self) -> None:
+        from server import app
+        self.app = app.test_client()
+        self.tmp_dir = tempfile.TemporaryDirectory()
+        self.diary_path = Path(self.tmp_dir.name) / "Diary.txt"
+        self.patcher = patch("ac.handlers.diary.DIARY_PATH", self.diary_path)
+        self.patcher.start()
+        
+    def tearDown(self) -> None:
+        self.patcher.stop()
+        self.tmp_dir.cleanup()
+
+    @patch("ac.speech.speak")
+    def test_api_diary_write_speaks(self, mock_speak) -> None:
+        response = self.app.post("/api/diary/write", json={"text": "Today was a good day"})
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.json["success"])
+        self.assertEqual(mock_speak.call_count, 2)
+        mock_speak.assert_any_call("Diary: Today was a good day")
+        mock_speak.assert_any_call("Added to your diary.")
+
+    @patch("ac.speech.speak")
+    def test_api_diary_overwrite_speaks(self, mock_speak) -> None:
+        from ac.handlers.diary import append_diary_entry
+        append_diary_entry("First entry")
+        
+        response = self.app.post("/api/diary/overwrite", json={"index": 0, "text": "Modified entry"})
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.json["success"])
+        self.assertEqual(mock_speak.call_count, 2)
+        mock_speak.assert_any_call("Modify diary entry 0 to Modified entry")
+        mock_speak.assert_any_call("Diary entry updated successfully.")
+
+    @patch("ac.speech.speak")
+    def test_api_diary_delete_speaks(self, mock_speak) -> None:
+        from ac.handlers.diary import append_diary_entry
+        append_diary_entry("First entry")
+        
+        response = self.app.post("/api/diary/delete", json={"index": 0})
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.json["success"])
+        self.assertEqual(mock_speak.call_count, 2)
+        mock_speak.assert_any_call("Delete diary entry 0")
+        mock_speak.assert_any_call("Diary entry deleted successfully.")
+
+
 if __name__ == "__main__":
     unittest.main()

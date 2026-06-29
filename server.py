@@ -69,9 +69,15 @@ def api_get_diary():
 def api_write_diary():
     from flask import request
     from ac.handlers import diary
+    from ac.speech import speak
     data = request.json or {}
     text = data.get("text", "")
+    
+    # Speak command and response
+    speak(f"Diary: {text}")
     response = diary.append_diary_entry(text)
+    speak(response)
+    
     return jsonify({"success": True, "message": response})
 
 
@@ -79,13 +85,22 @@ def api_write_diary():
 def api_overwrite_diary():
     from flask import request
     from ac.handlers import diary
+    from ac.speech import speak
     data = request.json or {}
     try:
         index = int(data.get("index", -1))
     except (ValueError, TypeError):
         index = -1
     text = data.get("text", "")
+    
+    # Speak command
+    speak(f"Modify diary entry {index} to {text}")
     success = diary.update_entry(index, text)
+    if success:
+        speak("Diary entry updated successfully.")
+    else:
+        speak("Failed to update entry.")
+        
     return jsonify({"success": success})
 
 
@@ -93,12 +108,21 @@ def api_overwrite_diary():
 def api_delete_diary():
     from flask import request
     from ac.handlers import diary
+    from ac.speech import speak
     data = request.json or {}
     try:
         index = int(data.get("index", -1))
     except (ValueError, TypeError):
         index = -1
+        
+    # Speak command
+    speak(f"Delete diary entry {index}")
     success = diary.delete_entry(index)
+    if success:
+        speak("Diary entry deleted successfully.")
+    else:
+        speak("Failed to delete entry.")
+        
     return jsonify({"success": success})
 
 
