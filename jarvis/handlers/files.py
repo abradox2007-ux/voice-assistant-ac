@@ -1,11 +1,11 @@
-"""ac/handlers/files.py — Open existing files and create new text files."""
+"""jarvis/handlers/files.py — Open existing files and create new text files."""
 
 from __future__ import annotations
 
 import os
 from pathlib import Path
 
-from ac.utils import find_best_file_match, sanitize_filename
+from jarvis.utils import find_best_file_match, sanitize_filename
 
 DATA_DIR = Path(__file__).parent.parent.parent / "data"
 

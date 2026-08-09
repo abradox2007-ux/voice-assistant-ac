@@ -1,4 +1,4 @@
-"""ac/utils.py — Shared utilities: config, logging, file helpers."""
+"""jarvis/utils.py — Shared utilities: config, logging, file helpers."""
 
 from __future__ import annotations
 
@@ -26,7 +26,7 @@ def load_config() -> dict:
 def setup_logging() -> logging.Logger:
     """Set up file + console logging and return the root logger."""
     LOG_DIR.mkdir(exist_ok=True)
-    log_file = LOG_DIR / "ac.log"
+    log_file = LOG_DIR / "jarvis.log"
 
     logging.basicConfig(
         level=logging.DEBUG,
@@ -36,7 +36,7 @@ def setup_logging() -> logging.Logger:
             logging.StreamHandler(),
         ],
     )
-    return logging.getLogger("ac")
+    return logging.getLogger("jarvis")
 
 
 def sanitize_filename(name: str) -> str:

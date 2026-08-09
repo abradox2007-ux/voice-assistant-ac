@@ -17,8 +17,35 @@ _state: dict = {
 }
 _history: deque = deque(maxlen=50)   # most-recent 50 commands
 
+_devices: dict = {
+    "light": {"name": "Living Room Light", "state": "off"},
+    "ac": {"name": "Smart AC", "state": "off", "temperature": 24},
+    "coffee": {"name": "Smart Coffee Maker", "state": "off"}
+}
 
-# ── Public helpers (called from main.py) ─────────────────────────────────────
+
+# ── Public helpers (called from main.py / router.py) ──────────────────────────
+
+def get_devices() -> dict:
+    with _lock:
+        return {k: dict(v) for k, v in _devices.items()}
+
+
+def update_device(device_id: str, updates: dict) -> bool:
+    with _lock:
+        if device_id in _devices:
+            for k, v in updates.items():
+                if k in _devices[device_id]:
+                    if k == "temperature":
+                        try:
+                            _devices[device_id][k] = int(v)
+                        except (ValueError, TypeError):
+                            pass
+                    else:
+                        _devices[device_id][k] = str(v)
+            return True
+        return False
+
 
 def set_status(phase: str, message: str) -> None:
     with _lock:
@@ -30,7 +57,6 @@ def set_status(phase: str, message: str) -> None:
 def get_status_phase() -> str:
     with _lock:
         return _state["phase"]
-
 
 
 def add_history(command: str, response: str, ok: bool = True) -> None:
@@ -57,26 +83,74 @@ def api_history():
         return jsonify(list(_history))
 
 
+@app.route("/api/devices", methods=["GET"])
+def api_get_devices():
+    return jsonify(get_devices())
+
+
+@app.route("/api/devices/update", methods=["POST"])
+def api_update_device():
+    from flask import request
+    data = request.json or {}
+    device_id = data.get("device")
+    updates = data.get("updates", {})
+    if device_id and updates:
+        success = update_device(device_id, updates)
+        return jsonify({"success": success})
+    return jsonify({"success": False, "error": "Invalid request parameters"}), 400
+
+
+@app.route("/api/command", methods=["POST"])
+def api_post_command():
+    from flask import request
+    from jarvis.utils import load_config
+    from jarvis.router import CommandRouter
+    from jarvis.speech import speak
+    
+    data = request.json or {}
+    command = data.get("command", "").strip()
+    if not command:
+        return jsonify({"success": False, "error": "Empty command"}), 400
+        
+    set_status("processing", f'Processing: "{command}"')
+    
+    try:
+        config = load_config()
+        router = CommandRouter(config)
+        response = router.route(command)
+        
+        speak(response, block=False)
+        
+        add_history(command, response, ok=True)
+        set_status("idle", f'Done: {response[:60]}')
+        return jsonify({"success": True, "response": response})
+    except Exception as exc:
+        err_msg = f"Error processing command: {exc}"
+        set_status("error", err_msg)
+        add_history(command, err_msg, ok=False)
+        return jsonify({"success": False, "response": err_msg}), 500
+
+
 # ── Diary APIs ────────────────────────────────────────────────────────────────
 
 @app.route("/api/diary", methods=["GET"])
 def api_get_diary():
-    from ac.handlers import diary
+    from jarvis.handlers import diary
     return jsonify(diary.get_diary_entries())
 
 
 @app.route("/api/diary/write", methods=["POST"])
 def api_write_diary():
     from flask import request
-    from ac.handlers import diary
-    from ac.speech import speak
+    from jarvis.handlers import diary
+    from jarvis.speech import speak
     data = request.json or {}
     text = data.get("text", "")
     
-    # Speak command and response
-    speak(f"Diary: {text}")
+    # Speak command and response (non-blocking)
+    speak(f"Diary: {text}", block=False)
     response = diary.append_diary_entry(text)
-    speak(response)
+    speak(response, block=False)
     
     return jsonify({"success": True, "message": response})
 
@@ -84,8 +158,8 @@ def api_write_diary():
 @app.route("/api/diary/overwrite", methods=["POST"])
 def api_overwrite_diary():
     from flask import request
-    from ac.handlers import diary
-    from ac.speech import speak
+    from jarvis.handlers import diary
+    from jarvis.speech import speak
     data = request.json or {}
     try:
         index = int(data.get("index", -1))
@@ -93,13 +167,13 @@ def api_overwrite_diary():
         index = -1
     text = data.get("text", "")
     
-    # Speak command
-    speak(f"Modify diary entry {index} to {text}")
+    # Speak command (non-blocking)
+    speak(f"Modify diary entry {index} to {text}", block=False)
     success = diary.update_entry(index, text)
     if success:
-        speak("Diary entry updated successfully.")
+        speak("Diary entry updated successfully.", block=False)
     else:
-        speak("Failed to update entry.")
+        speak("Failed to update entry.", block=False)
         
     return jsonify({"success": success})
 
@@ -107,28 +181,28 @@ def api_overwrite_diary():
 @app.route("/api/diary/delete", methods=["POST"])
 def api_delete_diary():
     from flask import request
-    from ac.handlers import diary
-    from ac.speech import speak
+    from jarvis.handlers import diary
+    from jarvis.speech import speak
     data = request.json or {}
     try:
         index = int(data.get("index", -1))
     except (ValueError, TypeError):
         index = -1
         
-    # Speak command
-    speak(f"Delete diary entry {index}")
+    # Speak command (non-blocking)
+    speak(f"Delete diary entry {index}", block=False)
     success = diary.delete_entry(index)
     if success:
-        speak("Diary entry deleted successfully.")
+        speak("Diary entry deleted successfully.", block=False)
     else:
-        speak("Failed to delete entry.")
+        speak("Failed to delete entry.", block=False)
         
     return jsonify({"success": success})
 
 
 @app.route("/api/status/reset", methods=["POST"])
 def api_status_reset():
-    set_status("idle", "AC is ready.")
+    set_status("idle", "Jarvis is ready.")
     return jsonify({"success": True})
 
 

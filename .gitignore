@@ -21,3 +21,6 @@ Thumbs.db
 
 # VS Code
 .vscode/
+
+# Audio binaries and models
+bin/

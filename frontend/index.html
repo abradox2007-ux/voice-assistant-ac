@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>AC — Voice Assistant</title>
+<title>Jarvis — Voice Assistant</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
 <style>
@@ -552,7 +552,7 @@
 <div class="app">
 
   <header>
-    <div class="logo-mark">AC</div>
+    <div class="logo-mark">JV</div>
     <div class="brand">Voice Assistant <span>v1.0</span></div>
     <div class="conn-dot" id="connDot"></div>
   </header>
@@ -591,7 +591,7 @@
     <div class="status-card">
       <div class="status-row">
         <div class="phase-badge" id="phaseBadge">OFFLINE</div>
-        <div class="status-msg"  id="statusMsg">Waiting for AC to start…</div>
+        <div class="status-msg"  id="statusMsg">Waiting for Jarvis to start…</div>
       </div>
 
       <div class="timeout-wrap" id="timeoutWrap">
@@ -605,21 +605,75 @@
       </div>
     </div>
 
-    <!-- Command history -->
+    <!-- Smart Home Control Panel -->
+    <div class="status-card" style="margin-top: 10px;">
+      <div class="section-label" style="margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
+        🏠 Smart Home Dashboard
+      </div>
+      <div class="smart-home-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px;">
+        
+        <!-- Light Card -->
+        <div class="device-card" id="cardLight" style="background: rgba(255,255,255,0.02); border: 1px solid var(--border); border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 12px; transition: all 0.3s ease;">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <span style="font-size: 24px; transition: all 0.3s;" id="iconLight">💡</span>
+            <span class="phase-badge" id="badgeLight" style="font-size: 9px; letter-spacing: 1px; --phase-color: var(--muted);">OFF</span>
+          </div>
+          <div>
+            <div style="font-weight: 600; font-size: 15px;">Living Room Light</div>
+            <div style="font-size: 12px; color: var(--muted);" id="subLight">Inactive</div>
+          </div>
+          <button class="btn-primary" id="btnToggleLight" style="padding: 6px 12px; font-size: 12px; border-radius: 6px; width: 100%;" onclick="toggleVirtualDevice('light')">Toggle</button>
+        </div>
+
+        <!-- Smart AC Card -->
+        <div class="device-card" id="cardAC" style="background: rgba(255,255,255,0.02); border: 1px solid var(--border); border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 12px; transition: all 0.3s ease;">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <span style="font-size: 24px; transition: all 0.3s;" id="iconAC">❄️</span>
+            <span class="phase-badge" id="badgeAC" style="font-size: 9px; letter-spacing: 1px; --phase-color: var(--muted);">OFF</span>
+          </div>
+          <div>
+            <div style="font-weight: 600; font-size: 15px;">Smart AC</div>
+            <div style="font-size: 12px; color: var(--muted);" id="subAC">Off</div>
+          </div>
+          <button class="btn-primary" id="btnToggleAC" style="padding: 6px 12px; font-size: 12px; border-radius: 6px; width: 100%;" onclick="toggleVirtualDevice('ac')">Toggle</button>
+        </div>
+
+        <!-- Coffee Card -->
+        <div class="device-card" id="cardCoffee" style="background: rgba(255,255,255,0.02); border: 1px solid var(--border); border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 12px; transition: all 0.3s ease;">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <span style="font-size: 24px; transition: all 0.3s;" id="iconCoffee">☕</span>
+            <span class="phase-badge" id="badgeCoffee" style="font-size: 9px; letter-spacing: 1px; --phase-color: var(--muted);">OFF</span>
+          </div>
+          <div>
+            <div style="font-weight: 600; font-size: 15px;">Coffee Maker</div>
+            <div style="font-size: 12px; color: var(--muted);" id="subCoffee">Off</div>
+          </div>
+          <button class="btn-primary" id="btnToggleCoffee" style="padding: 6px 12px; font-size: 12px; border-radius: 6px; width: 100%;" onclick="toggleVirtualDevice('coffee')">Toggle</button>
+        </div>
+
+      </div>
+    </div>
+
     <div>
       <div class="section-label">Command History</div>
       <div class="history-list" id="historyList">
         <div class="empty-state">
           <div class="empty-icon">🎙</div>
-          No commands yet — say "Hey AC" to begin
+          No commands yet — say "Hey Jarvis" to begin
         </div>
       </div>
+    </div>
+
+    <!-- Chat Input Section -->
+    <div style="position: sticky; bottom: 16px; background: rgba(19, 20, 26, 0.75); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border: 1px solid var(--border); border-radius: 16px; padding: 12px 16px; display: flex; gap: 12px; align-items: center; box-shadow: 0 8px 32px rgba(0,0,0,0.5); z-index: 100;">
+      <input type="text" id="chatInput" placeholder="Type a command (e.g. 'turn on the light' or 'create file todos')..." style="flex: 1; background: transparent; border: none; outline: none; color: var(--text); font-family: inherit; font-size: 14px;" onkeydown="handleChatKey(event)" />
+      <button class="btn-primary" style="padding: 8px 16px; font-size: 13px; border-radius: 8px; flex-shrink: 0;" onclick="submitChatCommand()">Send</button>
     </div>
 
   </main>
 
   <footer>
-    <div>Say "Hey AC" to wake · 15s window</div>
+    <div>Say "Hey Jarvis" to wake · 15s window</div>
     <div class="footer-commands">
       <span class="cmd-chip">open [site/app]</span>
       <span class="cmd-chip">create file [name]</span>
@@ -858,7 +912,7 @@ async function pollStatus() {
     if (connected) {
       connected = false;
       connDot.classList.remove('online');
-      applyPhase('error', 'Cannot reach AC server — is main.py running?');
+      applyPhase('error', 'Cannot reach Jarvis server — is main.py running?');
     }
   }
 }
@@ -1048,14 +1102,134 @@ function showToast(msg, type) {
 /* ── Boot ────────────────────────────────────────────────────── */
 (async function boot() {
   // initial paint
-  applyPhase('idle', 'Waiting for AC to start…');
+  applyPhase('idle', 'Waiting for Jarvis to start…');
 
   setInterval(pollStatus,  POLL_MS);
   setInterval(pollHistory, POLL_MS * 2);
+  setInterval(updateSmartHomeUI, POLL_MS * 2);
 
   pollStatus();
   pollHistory();
+  updateSmartHomeUI();
 })();
+
+/* ── Smart Home & Chat Input Logic ────────────────────────────── */
+function handleChatKey(e) {
+  if (e.key === 'Enter') {
+    submitChatCommand();
+  }
+}
+
+function submitChatCommand() {
+  const input = document.getElementById('chatInput');
+  const cmd = input.value.trim();
+  if (!cmd) return;
+  input.value = '';
+
+  // Visual processing state
+  applyPhase('processing', `Processing: "${cmd}"`);
+
+  fetch('/api/command', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ command: cmd })
+  })
+  .then(res => res.json())
+  .then(data => {
+    if (data.success) {
+      pollStatus(); // Refresh status
+      pollHistory(); // Refresh history
+      updateSmartHomeUI(); // Refresh smart home devices
+    } else {
+      applyPhase('error', data.response || 'Failed to execute command');
+    }
+  })
+  .catch(err => {
+    console.error(err);
+    applyPhase('error', 'Network error calling command API');
+  });
+}
+
+function toggleVirtualDevice(device) {
+  fetch('/api/devices')
+    .then(res => res.json())
+    .then(devices => {
+      const dev = devices[device];
+      if (!dev) return;
+      const newState = dev.state === 'on' ? 'off' : 'on';
+      const updates = { state: newState };
+      
+      if (device === 'ac' && newState === 'on') {
+        updates.temperature = 24;
+      }
+
+      fetch('/api/devices/update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ device: device, updates: updates })
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          updateSmartHomeUI();
+        }
+      });
+    })
+    .catch(err => console.error("Error toggling device:", err));
+}
+
+function updateSmartHomeUI() {
+  fetch('/api/devices')
+    .then(res => res.json())
+    .then(devices => {
+      for (const [id, dev] of Object.entries(devices)) {
+        const card = document.getElementById(`card${id.toUpperCase()}`);
+        const badge = document.getElementById(`badge${id.toUpperCase()}`);
+        const sub = document.getElementById(`sub${id.toUpperCase()}`);
+        const icon = document.getElementById(`icon${id.toUpperCase()}`);
+
+        if (!card || !badge || !sub) continue;
+
+        const isOn = dev.state === 'on';
+        badge.textContent = isOn ? 'ON' : 'OFF';
+        
+        if (isOn) {
+          badge.style.setProperty('--phase-color', 'var(--green)');
+          card.style.borderColor = 'var(--green)';
+          card.style.background = 'rgba(74, 222, 128, 0.04)';
+          if (id === 'light') {
+            icon.textContent = '💡';
+            sub.textContent = 'Glowing';
+            card.style.boxShadow = '0 0 16px rgba(74, 222, 128, 0.15)';
+          } else if (id === 'ac') {
+            icon.textContent = '❄️';
+            sub.textContent = `${dev.temperature || 24}°C (Cooling)`;
+            card.style.boxShadow = '0 0 16px rgba(108, 141, 250, 0.15)';
+          } else if (id === 'coffee') {
+            icon.textContent = '☕';
+            sub.textContent = 'Brewing';
+            card.style.boxShadow = '0 0 16px rgba(167, 139, 250, 0.15)';
+          }
+        } else {
+          badge.style.setProperty('--phase-color', 'var(--muted)');
+          card.style.borderColor = 'var(--border)';
+          card.style.background = 'rgba(255,255,255,0.02)';
+          card.style.boxShadow = 'none';
+          if (id === 'light') {
+            icon.textContent = '⚫';
+            sub.textContent = 'Inactive';
+          } else if (id === 'ac') {
+            icon.textContent = '💨';
+            sub.textContent = 'Off';
+          } else if (id === 'coffee') {
+            icon.textContent = '💤';
+            sub.textContent = 'Off';
+          }
+        }
+      }
+    })
+    .catch(err => console.error("Error fetching devices:", err));
+}
 </script>
 </body>
 </html>

@@ -1,16 +1,17 @@
-"""Voice Assistant AC — entry point with frontend server integration."""
+"""Voice Assistant Jarvis — entry point with frontend server integration."""
 
 from __future__ import annotations
 
 import sys
 import time
 import threading
+import webbrowser
 
-from ac.listener import Listener
-from ac.router import CommandRouter
-from ac.speech import shutdown as shutdown_speech
-from ac.speech import speak
-from ac.utils import load_config, setup_logging
+from jarvis.listener import Listener
+from jarvis.router import CommandRouter
+from jarvis.speech import shutdown as shutdown_speech
+from jarvis.speech import speak
+from jarvis.utils import load_config, setup_logging
 from server import app as flask_app, set_status, add_history
 
 
@@ -24,7 +25,7 @@ def run_flask():
 
 def main() -> None:
     logger = setup_logging()
-    logger.info("Starting Voice Assistant AC")
+    logger.info("Starting Voice Assistant Jarvis")
 
     try:
         config = load_config()
@@ -35,7 +36,14 @@ def main() -> None:
     # Start Flask frontend server in background
     flask_thread = threading.Thread(target=run_flask, daemon=True)
     flask_thread.start()
-    logger.info("Frontend server started at http://localhost:5050")                 ##hoooooooooooo
+    logger.info("Frontend server started at http://localhost:5050")
+
+    # Automatically open the localhost frontend in the default browser.
+    # We use a brief delay (0.5 seconds) to ensure the server starts up first.
+    try:
+        threading.Timer(0.5, lambda: webbrowser.open("http://localhost:5050")).start()
+    except Exception as exc:
+        logger.warning("Could not open web browser automatically: %s", exc)                 ##hoooooooooooo
                                                                                     ##ha ha ha bankai zenponzakura kageyoshi
 
     router = CommandRouter(config)
@@ -59,11 +67,14 @@ def main() -> None:
             mic_error_spoken = True
 
     listener = Listener(
+        device_index=config.get("mic_index"),
+        stt_engine=config.get("stt_engine", "google"),
+        whisper_model=config.get("whisper_model", "base"),
         on_network_error=on_network_error,
         on_mic_error=on_mic_error,
     )
 
-    greeting = "AC is ready. Say hey AC followed by your command."
+    greeting = "Jarvis is ready. Say Hey Jarvis followed by your command."
     speak(greeting)
     set_status("idle", greeting)
 
@@ -76,29 +87,18 @@ def main() -> None:
                     time.sleep(0.2)
 
                 # ── Phase 1: Wait for wake word ──────────────────────────
-                set_status("waiting", "Waiting for wake word... say \"Hey AC\"")
+                set_status("waiting", "Waiting for wake word... say \"Hey Jarvis\"")
                 _, inline_command = listener.wait_for_wake_word()
 
                 speak("Yes?")
                 set_status("listening", "Listening... speak your command now")
 
                 # ── Phase 2: Capture command with 15s timeout ────────────
-                command = None
-                deadline = time.time() + LISTEN_TIMEOUT
-
-                while time.time() < deadline:
-                    remaining = max(0, int(deadline - time.time()))
-                    set_status(
-                        "listening",
-                        f"Listening... ({remaining}s left)",
-                    )
-                    command = listener.capture_command(
-                        inline_command=inline_command,
-                        timeout=min(3, max(1, remaining)),   # short polling chunks
-                    )
-                    if command:
-                        break
-                    inline_command = None  # only use inline once
+                if inline_command:
+                    command = inline_command
+                else:
+                    set_status("listening", "Listening... speak your command now")
+                    command = listener.capture_command(timeout=LISTEN_TIMEOUT)
 
                 # ── Phase 3: Handle timeout ──────────────────────────────
                 if not command:
@@ -107,14 +107,13 @@ def main() -> None:
                     set_status("waiting", timeout_msg)
                     add_history("(timeout)", timeout_msg, ok=False)
                     time.sleep(0.5)
-                    restart_msg = 'Tell your command by saying "Hey AC" and your command.'
+                    restart_msg = 'Tell your command by saying "Hey Jarvis" and your command.'
                     speak(restart_msg)
                     set_status("idle", restart_msg)
                     continue
 
                 # ── Phase 4: Route the command ───────────────────────────
                 set_status("processing", f'Processing: "{command}"')
-                speak(command)
                 response = router.route(command)
                 speak(response)
                 add_history(command, response, ok=True)
