@@ -18,6 +18,25 @@ HELP_TEXT = (
     "What time is it, What's the date, What's the weather."
 )
 
+DISMISSAL_PHRASES = {
+    "stop", "bye", "goodbye", "good bye", "go to sleep", "sleep", "sleep now",
+    "that's all", "thats all", "that is all", "thank you", "thanks", "thank you jarvis",
+    "nevermind", "never mind", "exit", "cancel", "standby", "stand by", "close", "mute",
+    "நன்றி", "போதும்", "முடிந்தது"
+}
+
+
+def is_dismissal(command: str) -> bool:
+    """Return True if command is a follow-up dismissal / go-to-sleep instruction."""
+    if not command:
+        return False
+    cmd = command.strip().lower().rstrip(".!?,")
+    if cmd in DISMISSAL_PHRASES:
+        return True
+    if any(cmd.startswith(prefix) for prefix in ("stop", "bye", "thank you", "thanks", "go to sleep", "never mind", "that's all", "thats all")):
+        return True
+    return False
+
 
 def translate_tamil_to_english(cmd: str) -> str:
     """Translate common Tamil command patterns to English equivalents."""
@@ -141,6 +160,12 @@ class CommandRouter:
         # ── Safety: no delete ────────────────────────────────────────────────
         if any(w in cmd for w in ("delete", "remove", "erase", "unlink")):
             return "Delete commands are not supported for safety reasons."
+
+        # ── Follow-up Dismissal / Standby ────────────────────────────────────
+        if is_dismissal(cmd):
+            if any(w in cmd for w in ("thank", "thanks", "நன்றி")):
+                return "You're very welcome. Standing by."
+            return "Going on standby. Say Hey Jarvis when you need me."
 
         # ── Help ─────────────────────────────────────────────────────────────
         if cmd in ("help", "what can you do", "commands"):

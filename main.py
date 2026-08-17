@@ -74,6 +74,9 @@ def main() -> None:
         on_mic_error=on_mic_error,
     )
 
+    continuous_conversation = config.get("continuous_conversation", True)
+    follow_up_timeout = float(config.get("follow_up_timeout", 8.0))
+
     greeting = "Jarvis is ready. Say Hey Jarvis followed by your command."
     speak(greeting)
     set_status("idle", greeting)
@@ -90,7 +93,7 @@ def main() -> None:
                 set_status("waiting", "Waiting for wake word... say \"Hey Jarvis\"")
                 _, inline_command = listener.wait_for_wake_word()
 
-                # ── Phase 2: Capture command ─────────────────────────────
+                # ── Phase 2: Capture initial command ─────────────────────
                 if inline_command:
                     command = inline_command
                     logger.info("Executing inline command directly: '%s'", command)
@@ -99,7 +102,7 @@ def main() -> None:
                     set_status("listening", "Listening... speak your command now")
                     command = listener.capture_command(timeout=LISTEN_TIMEOUT)
 
-                # ── Phase 3: Handle timeout ──────────────────────────────
+                # ── Phase 3: Handle initial timeout ──────────────────────
                 if not command:
                     timeout_msg = "I didn't catch that. Say Hey Jarvis when you're ready."
                     speak(timeout_msg)
@@ -109,13 +112,42 @@ def main() -> None:
                     set_status("idle", 'Ready. Say "Hey Jarvis" followed by your command.')
                     continue
 
-                # ── Phase 4: Route the command ───────────────────────────
+                # ── Phase 4: Route initial command ───────────────────────
                 set_status("processing", f'Processing: "{command}"')
                 response = router.route(command)
                 speak(response)
                 add_history(command, response, ok=True)
                 if response != "Opening manual diary panel.":
                     set_status("idle", f'Done: {response[:60]}{"…" if len(response) > 60 else ""}')
+
+                from jarvis.router import is_dismissal
+                if is_dismissal(command):
+                    continue
+
+                # ── Phase 5: Continuous Conversation Follow-Up Loop ──────
+                if continuous_conversation:
+                    logger.info("Entering continuous conversation mode (timeout: %.1fs)...", follow_up_timeout)
+                    while True:
+                        set_status("listening", "Listening for follow-up... (say 'stop' or wait to sleep)")
+                        follow_up = listener.capture_command(timeout=int(follow_up_timeout))
+
+                        if not follow_up:
+                            logger.info("Follow-up silence timeout. Returning to wake-word standby.")
+                            set_status("idle", 'Standing by. Say "Hey Jarvis" when ready.')
+                            break
+
+                        logger.info("Follow-up command received: '%s'", follow_up)
+                        set_status("processing", f'Processing: "{follow_up}"')
+                        follow_up_res = router.route(follow_up)
+                        speak(follow_up_res)
+                        add_history(follow_up, follow_up_res, ok=True)
+
+                        if is_dismissal(follow_up):
+                            set_status("idle", 'Standing by. Say "Hey Jarvis" when ready.')
+                            break
+
+                        if follow_up_res != "Opening manual diary panel.":
+                            set_status("idle", f'Done: {follow_up_res[:60]}{"…" if len(follow_up_res) > 60 else ""}')
 
                 network_error_spoken = False
                 mic_error_spoken = False

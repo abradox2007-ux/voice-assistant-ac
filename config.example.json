@@ -1,5 +1,13 @@
 {
   "gemini_api_key": "YOUR_GEMINI_API_KEY_HERE",
+  "stt_engine": "whisper",
+  "whisper_model": "base",
+  "tts_engine": "piper",
+  "wake_word_engine": "openwakeword",
+  "wake_word_model": "hey_jarvis",
+  "wake_word_threshold": 0.38,
+  "continuous_conversation": true,
+  "follow_up_timeout": 8.0,
   "search_paths": [
     "~/Desktop",
     "~/Documents",
