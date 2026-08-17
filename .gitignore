@@ -23,4 +23,7 @@ Thumbs.db
 .vscode/
 
 # Audio binaries and models
-bin/
+bin/
+
+# Scratch files
+scratch/

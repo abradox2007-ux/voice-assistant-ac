@@ -73,7 +73,13 @@ def call_gemini(prompt: str, config: dict) -> str | None:
             temperature=0.7,
         )
 
-        models = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"]
+        models = [
+            "gemini-2.5-flash",
+            "gemini-3.5-flash",
+            "gemini-3.5-flash-lite",
+            "gemini-2.5-pro",
+            "gemini-flash-lite-latest"
+        ]
         for model in models:
             try:
                 response = _gemini_client.models.generate_content(

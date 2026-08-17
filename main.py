@@ -90,26 +90,23 @@ def main() -> None:
                 set_status("waiting", "Waiting for wake word... say \"Hey Jarvis\"")
                 _, inline_command = listener.wait_for_wake_word()
 
-                speak("Yes?")
-                set_status("listening", "Listening... speak your command now")
-
-                # ── Phase 2: Capture command with 15s timeout ────────────
+                # ── Phase 2: Capture command ─────────────────────────────
                 if inline_command:
                     command = inline_command
+                    logger.info("Executing inline command directly: '%s'", command)
                 else:
+                    speak("Yes?")
                     set_status("listening", "Listening... speak your command now")
                     command = listener.capture_command(timeout=LISTEN_TIMEOUT)
 
                 # ── Phase 3: Handle timeout ──────────────────────────────
                 if not command:
-                    timeout_msg = "Couldn't understand command. Tell again."
+                    timeout_msg = "I didn't catch that. Say Hey Jarvis when you're ready."
                     speak(timeout_msg)
                     set_status("waiting", timeout_msg)
-                    add_history("(timeout)", timeout_msg, ok=False)
-                    time.sleep(0.5)
-                    restart_msg = 'Tell your command by saying "Hey Jarvis" and your command.'
-                    speak(restart_msg)
-                    set_status("idle", restart_msg)
+                    add_history("(no speech/timeout)", timeout_msg, ok=False)
+                    time.sleep(0.3)
+                    set_status("idle", 'Ready. Say "Hey Jarvis" followed by your command.')
                     continue
 
                 # ── Phase 4: Route the command ───────────────────────────
