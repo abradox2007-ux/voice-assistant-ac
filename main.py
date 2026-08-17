@@ -12,7 +12,7 @@ from jarvis.router import CommandRouter
 from jarvis.speech import shutdown as shutdown_speech
 from jarvis.speech import speak
 from jarvis.utils import load_config, setup_logging
-from server import app as flask_app, set_status, add_history
+from server import app as flask_app, set_status, add_history, set_router
 
 
 LISTEN_TIMEOUT = 15  # seconds to wait for a command before giving up
@@ -33,6 +33,9 @@ def main() -> None:
         print(f"Failed to load config.json: {exc}")
         sys.exit(1)
 
+    router = CommandRouter(config)
+    set_router(router)
+
     # Start Flask frontend server in background
     flask_thread = threading.Thread(target=run_flask, daemon=True)
     flask_thread.start()
@@ -43,10 +46,7 @@ def main() -> None:
     try:
         threading.Timer(0.5, lambda: webbrowser.open("http://localhost:5050")).start()
     except Exception as exc:
-        logger.warning("Could not open web browser automatically: %s", exc)                 ##hoooooooooooo
-                                                                                    ##ha ha ha bankai zenponzakura kageyoshi
-
-    router = CommandRouter(config)
+        logger.warning("Could not open web browser automatically: %s", exc)
     network_error_spoken = False
     mic_error_spoken = False
 

@@ -14,9 +14,9 @@ def open_url(name: str, url_aliases: dict[str, str]) -> str:
     url = url_aliases.get(key)
 
     if url is None:
-        # Check partial match
+        # Check word-boundary match
         for alias, link in url_aliases.items():
-            if key in alias or alias in key:
+            if key == alias or key in alias.split() or alias in key.split():
                 url = link
                 name = alias
                 break

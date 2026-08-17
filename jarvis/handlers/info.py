@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import time
 
+import re
 import requests
 
 
@@ -24,7 +25,9 @@ def tell_weather(city: str, country: str) -> str:
         weather_text = resp.text.strip()
         # wttr.in format: "City: ⛅  +28°C"
         # Make it speech-friendly
-        clean = weather_text.replace("°", " degrees ").replace("+", "").replace("⛅", "").replace("☀", "").replace("🌧", "").replace("🌩", "")
+        clean = weather_text.replace("°C", " degrees Celsius").replace("°F", " degrees Fahrenheit").replace("°", " degrees ")
+        clean = clean.replace("+", "")
+        clean = re.sub(r"[^\x00-\x7F]+", " ", clean)
         clean = " ".join(clean.split())
         return f"The weather in {city}: {clean}."
     except Exception as exc:

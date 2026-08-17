@@ -11,6 +11,13 @@ import pyttsx3
 # Thread-safe queue to pass text and done events to the TTS thread
 _speech_queue: queue.Queue[tuple[str, threading.Event | None] | None] = queue.Queue()
 
+_speaking_event = threading.Event()
+
+
+def is_speaking() -> bool:
+    """Return True if the assistant is currently speaking."""
+    return _speaking_event.is_set()
+
 
 def _tts_worker() -> None:
     """Dedicated background thread to handle SAPI/Piper initialization and speech tasks sequentially."""
@@ -56,52 +63,57 @@ def _tts_worker() -> None:
             break
         text, done_event = item
 
-        spoken_via_piper = False
-        if tts_engine == "piper" and p_audio is not None and pyaudio is not None and piper_path and piper_model:
-            if os.path.exists(piper_path) and os.path.exists(piper_model):
-                try:
-                    command = [
-                        str(piper_path),
-                        "--model", str(piper_model),
-                        "--output-raw"
-                    ]
-                    process = subprocess.Popen(
-                        command,
-                        stdin=subprocess.PIPE,
-                        stdout=subprocess.PIPE,
-                        stderr=subprocess.DEVNULL
-                    )
-                    audio_data, _ = process.communicate(input=text.encode("utf-8"))
-                    
-                    if len(audio_data) > 0:
-                        stream = p_audio.open(
-                            format=pyaudio.paInt16,
-                            channels=1,
-                            rate=22050,
-                            output=True
-                        )
-                        stream.write(audio_data)
-                        stream.stop_stream()
-                        stream.close()
-                        spoken_via_piper = True
-                except Exception as exc:
-                    print(f"[speech] Piper error: {exc}. Falling back to pyttsx3.")
+        _speaking_event.set()
 
-        if not spoken_via_piper and engine is not None:
-            try:
-                engine.say(text)
-                engine.runAndWait()
-            except Exception as exc:
-                print(f"[speech] SAPI runtime error: {exc}")
-                # Try to recreate the engine instance on error
+        try:
+            spoken_via_piper = False
+            if tts_engine == "piper" and p_audio is not None and pyaudio is not None and piper_path and piper_model:
+                if os.path.exists(piper_path) and os.path.exists(piper_model):
+                    try:
+                        command = [
+                            str(piper_path),
+                            "--model", str(piper_model),
+                            "--output-raw"
+                        ]
+                        process = subprocess.Popen(
+                            command,
+                            stdin=subprocess.PIPE,
+                            stdout=subprocess.PIPE,
+                            stderr=subprocess.DEVNULL
+                        )
+                        audio_data, _ = process.communicate(input=text.encode("utf-8"))
+                        
+                        if len(audio_data) > 0:
+                            stream = p_audio.open(
+                                format=pyaudio.paInt16,
+                                channels=1,
+                                rate=22050,
+                                output=True
+                            )
+                            stream.write(audio_data)
+                            stream.stop_stream()
+                            stream.close()
+                            spoken_via_piper = True
+                    except Exception as exc:
+                        print(f"[speech] Piper error: {exc}. Falling back to pyttsx3.")
+
+            if not spoken_via_piper and engine is not None:
                 try:
-                    engine = pyttsx3.init()
-                    engine.setProperty("rate", 170)
-                    engine.setProperty("volume", 1.0)
                     engine.say(text)
                     engine.runAndWait()
-                except Exception as retry_exc:
-                    print(f"[speech] Failed to recover SAPI engine: {retry_exc}")
+                except Exception as exc:
+                    print(f"[speech] SAPI runtime error: {exc}")
+                    # Try to recreate the engine instance on error
+                    try:
+                        engine = pyttsx3.init()
+                        engine.setProperty("rate", 170)
+                        engine.setProperty("volume", 1.0)
+                        engine.say(text)
+                        engine.runAndWait()
+                    except Exception as retry_exc:
+                        print(f"[speech] Failed to recover SAPI engine: {retry_exc}")
+        finally:
+            _speaking_event.clear()
 
         if done_event is not None:
             done_event.set()

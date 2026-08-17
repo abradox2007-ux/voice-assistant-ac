@@ -14,6 +14,7 @@ import speech_recognition as sr
 
 from jarvis.vad import SileroVAD
 from jarvis.utils import load_config
+from jarvis.speech import is_speaking
 
 logger = logging.getLogger(__name__)
 
@@ -51,6 +52,9 @@ class Listener:
 
         self._wake_word_engine = config.get("wake_word_engine", "openwakeword")
         self._wake_word_model_name = config.get("wake_word_model", "hey_jarvis")
+        self._wake_word_threshold = config.get("wake_word_threshold", 0.6)  # Default to 0.6 to prevent false triggers
+        self._vad_threshold = config.get("vad_threshold", 0.35)  # Lower default threshold to be more sensitive to quiet voice
+        self._vad_initial_timeout = config.get("vad_initial_timeout", 5.0)  # Time to wait for user to start speaking
         self._vad_model_path = config.get("vad_model_path", "bin/vad/silero_vad.onnx")
 
         # 1. Preload STT Whisper
@@ -156,7 +160,9 @@ class Listener:
                 # Read 1024 samples (64ms of audio)
                 data = stream.read(1024, exception_on_overflow=False)
                 if data:
-                    self._audio_queue.put(data)
+                    # Only queue audio frames if the assistant is not currently speaking
+                    if not is_speaking():
+                        self._audio_queue.put(data)
             except Exception as e:
                 logger.warning("Error reading audio frame: %s", e)
                 time.sleep(0.1)
@@ -172,7 +178,11 @@ class Listener:
 
     # ── VAD Capturing State Machine ───────────────────────────────────────────
 
-    def _capture_speech_with_vad(self, initial_audio: bytes) -> sr.AudioData:
+    def _capture_speech_with_vad(
+        self,
+        initial_audio: bytes,
+        max_duration: float = 12.0
+    ) -> sr.AudioData | None:
         """
         Record audio chunks from the queue using Silero VAD until speech ends.
         """
@@ -184,14 +194,13 @@ class Listener:
         speech_started = False
         silence_start_time = None
         start_time = time.time()
-        max_duration = 12.0  # limit commands to 12s
 
         # Run VAD on initial_audio to see if speech has already started
         if initial_audio and self._vad is not None:
             initial_samples = np.frombuffer(initial_audio, dtype=np.int16).astype(np.float32) / 32768.0
             for i in range(0, len(initial_samples), 512):
                 if i + 512 <= len(initial_samples):
-                    if self._vad.is_speech(initial_samples[i : i + 512]):
+                    if self._vad.is_speech(initial_samples[i : i + 512], threshold=self._vad_threshold):
                         speech_started = True
 
         while self._running:
@@ -210,8 +219,15 @@ class Listener:
             if self._vad is not None:
                 chunk = np.frombuffer(data, dtype=np.int16).astype(np.float32) / 32768.0
                 
-                # Split 1024 samples into two 512 VAD chunks
-                is_speech_chunk = self._vad.is_speech(chunk[:512]) or self._vad.is_speech(chunk[512:])
+                # Split 1024 samples into two 512 VAD chunks sequentially to prevent state corruption
+                prob1 = self._vad.get_speech_probability(chunk[:512])
+                prob2 = self._vad.get_speech_probability(chunk[512:])
+                is_speech_chunk = (prob1 >= self._vad_threshold) or (prob2 >= self._vad_threshold)
+                
+                logger.debug(
+                    "VAD probabilities: chunk1=%.3f, chunk2=%.3f (threshold=%.3f, speech_started=%s)",
+                    prob1, prob2, self._vad_threshold, speech_started
+                )
                 
                 if is_speech_chunk:
                     if not speech_started:
@@ -226,29 +242,53 @@ class Listener:
                             logger.info("Speech ended (silence timeout).")
                             break
                     else:
-                        # Cutoff if no speech detected at all within first 3.5s
-                        if time.time() - start_time > 3.5:
+                        # Cutoff if no speech detected at all within first self._vad_initial_timeout seconds
+                        if time.time() - start_time > self._vad_initial_timeout:
                             logger.info("No speech detected (initial VAD timeout).")
                             break
             else:
                 # If VAD failed to load, fall back to simple time limit
                 if time.time() - start_time > 4.0:
+                    speech_started = True  # Fallback to transcribe anyway
                     break
+
+        if self._vad is not None and not speech_started:
+            logger.info("No speech detected by VAD. Skipping transcription to prevent hallucination.")
+            return None
 
         raw_wav = b"".join(accumulated_frames)
         return sr.AudioData(raw_wav, 16000, 2)
 
-    def _transcribe(self, audio: sr.AudioData) -> str | None:
+    def _transcribe(self, audio: sr.AudioData | None) -> str | None:
+        if audio is None:
+            return None
         try:
             if self._stt_engine == "whisper" and self._whisper_model_instance is not None:
                 import io
                 wav_data = io.BytesIO(audio.get_wav_data(convert_rate=16000, convert_width=2))
                 segments, info = self._whisper_model_instance.transcribe(
                     wav_data,
-                    beam_size=1,
-                    language="en"
+                    beam_size=3,
+                    language="en",
+                    condition_on_previous_text=False
                 )
-                text = "".join([segment.text for segment in segments]).strip()
+                text_segments = []
+                for segment in segments:
+                    if segment.no_speech_prob < 0.6:
+                        text_segments.append(segment.text)
+                text = "".join(text_segments).strip()
+
+                # Filter out standard Whisper hallucinations on low confidence / silent audio
+                if text:
+                    cleaned_text = text.lower().strip().rstrip(".!?")
+                    hallucinations = {
+                        "thank you", "thank you for watching", "you", 
+                        "please subscribe", "subscribe", "bye", "watching"
+                    }
+                    if cleaned_text in hallucinations:
+                        logger.info("Filtered out Whisper hallucination: '%s'", text)
+                        return None
+
                 return text if text else None
             else:
                 # Transcribe in Indian English (optimized for local accents)
@@ -307,8 +347,8 @@ class Listener:
                     score = predictions.get(self._wake_word_model_name, 0.0)
 
                     # Trigger threshold
-                    if score > 0.4:
-                        logger.info("Wake word '%s' detected! Score: %.2f", self._wake_word_model_name, score)
+                    if score > self._wake_word_threshold:
+                        logger.info("Wake word '%s' detected! Score: %.2f (threshold: %.2f)", self._wake_word_model_name, score, self._wake_word_threshold)
 
                         # Collect history buffer raw bytes
                         pre_trigger_audio = b"".join(list(history_buffer))
@@ -323,7 +363,13 @@ class Listener:
                                 
                                 if self._vad is not None:
                                     float_chunk = np.frombuffer(chk, dtype=np.int16).astype(np.float32) / 32768.0
-                                    if self._vad.is_speech(float_chunk[:512]) or self._vad.is_speech(float_chunk[512:]):
+                                    prob1 = self._vad.get_speech_probability(float_chunk[:512])
+                                    prob2 = self._vad.get_speech_probability(float_chunk[512:])
+                                    logger.debug(
+                                        "Wake check VAD probabilities: chunk1=%.3f, chunk2=%.3f (threshold=%.3f)",
+                                        prob1, prob2, self._vad_threshold
+                                    )
+                                    if (prob1 >= self._vad_threshold) or (prob2 >= self._vad_threshold):
                                         speech_detected = True
                             except queue.Empty:
                                 break
@@ -346,8 +392,14 @@ class Listener:
                                 return text, stripped if stripped else None
                         return "", None
             else:
-                # Fallback if wake word engine is disabled/missing
-                time.sleep(0.5)
+                # Fallback if openwakeword model is not available: capture chunk and check with STT
+                audio_data = self._capture_speech_with_vad(b"", max_duration=4.0)
+                if audio_data is not None:
+                    text = self._transcribe(audio_data)
+                    if text and self.contains_wake_word(text):
+                        cmd = self.extract_command_from_wake(text)
+                        return text, cmd if cmd else None
+                time.sleep(0.1)
 
     def capture_command(
         self,
@@ -369,7 +421,7 @@ class Listener:
                 break
 
         logger.info("Listening for command...")
-        audio = self._capture_speech_with_vad(b"")
+        audio = self._capture_speech_with_vad(b"", max_duration=float(timeout))
         return self._transcribe(audio)
 
     def close(self) -> None:

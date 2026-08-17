@@ -22,9 +22,26 @@ _devices: dict = {
     "ac": {"name": "Smart AC", "state": "off", "temperature": 24},
     "coffee": {"name": "Smart Coffee Maker", "state": "off"}
 }
+_router = None
 
 
 # ── Public helpers (called from main.py / router.py) ──────────────────────────
+
+def set_router(router) -> None:
+    global _router
+    with _lock:
+        _router = router
+
+
+def get_router():
+    global _router
+    with _lock:
+        if _router is None:
+            from jarvis.utils import load_config
+            from jarvis.router import CommandRouter
+            config = load_config()
+            _router = CommandRouter(config)
+        return _router
 
 def get_devices() -> dict:
     with _lock:
@@ -103,8 +120,6 @@ def api_update_device():
 @app.route("/api/command", methods=["POST"])
 def api_post_command():
     from flask import request
-    from jarvis.utils import load_config
-    from jarvis.router import CommandRouter
     from jarvis.speech import speak
     
     data = request.json or {}
@@ -115,8 +130,7 @@ def api_post_command():
     set_status("processing", f'Processing: "{command}"')
     
     try:
-        config = load_config()
-        router = CommandRouter(config)
+        router = get_router()
         response = router.route(command)
         
         speak(response, block=False)

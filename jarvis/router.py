@@ -163,7 +163,7 @@ class CommandRouter:
         # ── Diary (must come before "open" check) ────────────────────────────
         diary_match = re.match(r"^diary\b\s*[,.:|-]?\s*(.*)$", cmd)
         if diary_match:
-            entry_text = translated_command[len(translated_command) - len(diary_match.group(1)):].strip()
+            entry_text = re.sub(r"^diary\b\s*[,.:|-]?\s*", "", translated_command, flags=re.IGNORECASE).strip()
             return diary.append_diary_entry(entry_text)
 
         # ── Weather ──────────────────────────────────────────────────────────
@@ -231,13 +231,13 @@ class CommandRouter:
 
             # URL alias?
             if target_lower in self._url_aliases or any(
-                target_lower in a or a in target_lower for a in self._url_aliases
+                target_lower == a or target_lower in a.split() or a in target_lower.split() for a in self._url_aliases
             ):
                 return urls.open_url(target, self._url_aliases)
 
             # App alias?
             if target_lower in self._app_aliases or any(
-                target_lower in a or a in target_lower for a in self._app_aliases
+                target_lower == a or target_lower in a.split() or a in target_lower.split() for a in self._app_aliases
             ):
                 return apps.open_app(target, self._app_aliases)
 

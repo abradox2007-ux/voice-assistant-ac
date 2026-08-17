@@ -15,7 +15,7 @@ def open_app(name: str, app_aliases: dict[str, str]) -> str:
 
     if exe is None:
         for alias, path in app_aliases.items():
-            if key in alias or alias in key:
+            if key == alias or key in alias.split() or alias in key.split():
                 exe = path
                 name = alias
                 break

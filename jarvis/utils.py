@@ -57,12 +57,20 @@ def find_best_file_match(
     all_matches: list[Path] = []
 
     for root in search_paths:
-        root = Path(root)
-        if not root.exists():
+        root_path = Path(root)
+        if not root_path.exists():
             continue
-        for entry in root.iterdir():
-            if entry.is_file() and query_lower in entry.stem.lower():
-                all_matches.append(entry)
+        try:
+            for current_root, dirs, files in os.walk(str(root_path)):
+                rel_depth = len(Path(current_root).relative_to(root_path).parts)
+                if rel_depth >= 3:
+                    dirs.clear()
+                for fname in files:
+                    fpath = Path(current_root) / fname
+                    if query_lower in fpath.stem.lower():
+                        all_matches.append(fpath)
+        except Exception:
+            continue
 
     if not all_matches:
         return None, []
