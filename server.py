@@ -220,6 +220,79 @@ def api_status_reset():
     return jsonify({"success": True})
 
 
+# ── Files Management APIs ─────────────────────────────────────────────────────
+
+@app.route("/api/files", methods=["GET"])
+def api_get_files():
+    from jarvis.handlers import files
+    return jsonify(files.list_data_files())
+
+
+@app.route("/api/files/read", methods=["GET"])
+def api_read_file():
+    from flask import request
+    from jarvis.handlers import files
+    name = request.args.get("name", "")
+    content = files.read_file_content(name)
+    return jsonify({"success": True, "name": name, "content": content})
+
+
+@app.route("/api/files/save", methods=["POST"])
+def api_save_file():
+    from flask import request
+    from jarvis.handlers import files
+    from jarvis.speech import speak
+    data = request.json or {}
+    name = data.get("name", "").strip()
+    content = data.get("content", "")
+    success = files.save_file_content(name, content)
+    if success:
+        speak(f"Saved changes to {name}.", block=False)
+    return jsonify({"success": success})
+
+
+@app.route("/api/files/rename", methods=["POST"])
+def api_rename_file():
+    from flask import request
+    from jarvis.handlers import files
+    from jarvis.speech import speak
+    data = request.json or {}
+    old_name = data.get("old_name", "").strip()
+    new_name = data.get("new_name", "").strip()
+    response = files.rename_file(old_name, new_name)
+    speak(response, block=False)
+    success = not response.startswith("Could not") and not response.startswith("Failed")
+    return jsonify({"success": success, "message": response})
+
+
+@app.route("/api/files/copy", methods=["POST"])
+def api_copy_file():
+    from flask import request
+    from jarvis.handlers import files
+    from jarvis.speech import speak
+    data = request.json or {}
+    source = data.get("source", "").strip()
+    destination = data.get("destination", "").strip()
+    response = files.copy_file(source, destination)
+    speak(response, block=False)
+    success = not response.startswith("Could not") and not response.startswith("Failed")
+    return jsonify({"success": success, "message": response})
+
+
+@app.route("/api/files/move", methods=["POST"])
+def api_move_file():
+    from flask import request
+    from jarvis.handlers import files
+    from jarvis.speech import speak
+    data = request.json or {}
+    source = data.get("source", "").strip()
+    destination = data.get("destination", "").strip()
+    response = files.move_file(source, destination)
+    speak(response, block=False)
+    success = not response.startswith("Could not") and not response.startswith("Failed")
+    return jsonify({"success": success, "message": response})
+
+
 # ── Serve the frontend ────────────────────────────────────────────────────────
 
 @app.route("/")

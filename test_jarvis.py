@@ -185,6 +185,123 @@ class RouterTests(unittest.TestCase):
         result = self.router.route("help")
         self.assertIn("open google", result.lower())
 
+    def test_dismissal_commands(self) -> None:
+        from jarvis.router import is_dismissal
+        self.assertTrue(is_dismissal("stop"))
+        self.assertTrue(is_dismissal("jarvis stop"))
+        self.assertTrue(is_dismissal("stop listening"))
+        self.assertTrue(is_dismissal("go to sleep"))
+        self.assertTrue(is_dismissal("standby"))
+        self.assertTrue(is_dismissal("bye"))
+        self.assertFalse(is_dismissal("open notepad"))
+        self.assertFalse(is_dismissal("create file test"))
+
+        res = self.router.route("stop")
+        self.assertIn("standby", res.lower())
+
+        res2 = self.router.route("thank you")
+        self.assertIn("welcome", res2.lower())
+
+    def test_dot_command_execution(self) -> None:
+        from jarvis.router import split_dot_commands
+
+        # Test single command with trailing dot word
+        self.assertEqual(split_dot_commands("open notepad dot"), ["open notepad"])
+        self.assertEqual(split_dot_commands("create file project sample our best."), ["create file project sample our best"])
+        self.assertEqual(split_dot_commands("create file project sample our best dot"), ["create file project sample our best"])
+
+        # Test multi-command separated by dot
+        self.assertEqual(split_dot_commands("open notepad dot open calculator dot"), ["open notepad", "open calculator"])
+        self.assertEqual(split_dot_commands("open google. open youtube."), ["open google", "open youtube"])
+
+        # Test execution through router
+        with patch("subprocess.Popen") as mock_popen:
+            res = self.router.route("open notepad dot")
+            mock_popen.assert_called_once()
+            self.assertIn("Opening notepad", res)
+
+    def test_write_and_take_notes_commands(self) -> None:
+        with patch("jarvis.handlers.files.write_to_file", return_value="Added to notes: 'meeting at 5pm'.") as mock_write:
+            res1 = self.router.route("take notes for notes meeting at 5pm")
+            mock_write.assert_called_with("notes", "meeting at 5pm", self.router._search_paths)
+            self.assertIn("Added to notes", res1)
+
+            res2 = self.router.route("add this to notes meeting at 5pm")
+            self.assertIn("Added to notes", res2)
+
+            res3 = self.router.route("copy this to notes meeting at 5pm")
+            self.assertIn("Added to notes", res3)
+
+            res4 = self.router.route("have this to notes meeting at 5pm")
+            self.assertIn("Added to notes", res4)
+
+            res5 = self.router.route("write to notes meeting at 5pm")
+            self.assertIn("Added to notes", res5)
+
+            res6 = self.router.route("note down in notes meeting at 5pm")
+            self.assertIn("Added to notes", res6)
+
+    def test_write_file_ai_action(self) -> None:
+        custom_config = dict(self.config)
+        custom_config["gemini_api_key"] = "test-api-key"
+        custom_router = CommandRouter(custom_config)
+
+        with patch("jarvis.handlers.files.write_to_file", return_value="Added to project sample: 'testing AI'.") as mock_write:
+            json_response = '{"action": "write_file", "file": "project sample", "text": "testing AI"}'
+            with patch("jarvis.router.ai.generate_voice_response", return_value=json_response):
+                result = custom_router.route("please write in my project sample that testing AI")
+                mock_write.assert_called_once_with("project sample", "testing AI", custom_router._search_paths)
+                self.assertIn("Added to project sample", result)
+
+    def test_file_rename_copy_move_commands(self) -> None:
+        with patch("jarvis.handlers.files.rename_file", return_value="Renamed 'old.txt' to 'new.txt'.") as mock_ren:
+            res_ren = self.router.route("rename file old to new")
+            mock_ren.assert_called_with("old", "new", self.router._search_paths)
+            self.assertIn("Renamed", res_ren)
+
+        with patch("jarvis.handlers.files.copy_file", return_value="Copied 'src.txt' to 'dst.txt'.") as mock_cp:
+            res_cp = self.router.route("copy file src to dst")
+            mock_cp.assert_called_with("src", "dst", self.router._search_paths)
+            self.assertIn("Copied", res_cp)
+
+        with patch("jarvis.handlers.files.move_file", return_value="Moved 'src.txt' to 'dst.txt'.") as mock_mv:
+            res_mv = self.router.route("cut file src to dst")
+            mock_mv.assert_called_with("src", "dst", self.router._search_paths)
+            self.assertIn("Moved", res_mv)
+
+            res_mv2 = self.router.route("move file src to dst")
+            self.assertIn("Moved", res_mv2)
+
+    def test_files_handler_crud(self) -> None:
+        from jarvis.handlers import files
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            with patch("jarvis.handlers.files.DATA_DIR", tmp_path):
+                # 1. Write file
+                files.write_to_file("my_note", "Hello World")
+                self.assertTrue((tmp_path / "my_note.txt").exists())
+                self.assertEqual(files.read_file_content("my_note"), "Hello World\n")
+
+                # 2. Copy file
+                res_copy = files.copy_file("my_note", "my_note_backup")
+                self.assertIn("Copied", res_copy)
+                self.assertTrue((tmp_path / "my_note_backup.txt").exists())
+
+                # 3. Rename file
+                res_ren = files.rename_file("my_note_backup", "renamed_note")
+                self.assertIn("Renamed", res_ren)
+                self.assertTrue((tmp_path / "renamed_note.txt").exists())
+                self.assertFalse((tmp_path / "my_note_backup.txt").exists())
+
+                # 4. Move / Cut file
+                res_mov = files.move_file("renamed_note", "final_note")
+                self.assertIn("Moved", res_mov)
+                self.assertTrue((tmp_path / "final_note.txt").exists())
+
+                # 5. List files
+                file_list = files.list_data_files()
+                self.assertEqual(len(file_list), 2)  # my_note.txt and final_note.txt
+
     def test_tamil_command_routing(self) -> None:
         from jarvis.router import translate_tamil_to_english
         self.assertEqual(translate_tamil_to_english("நேரம் என்ன"), "time")

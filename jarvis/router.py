@@ -22,7 +22,9 @@ DISMISSAL_PHRASES = {
     "stop", "bye", "goodbye", "good bye", "go to sleep", "sleep", "sleep now",
     "that's all", "thats all", "that is all", "thank you", "thanks", "thank you jarvis",
     "nevermind", "never mind", "exit", "cancel", "standby", "stand by", "close", "mute",
-    "நன்றி", "போதும்", "முடிந்தது"
+    "stop listening", "stop now", "please stop", "jarvis stop", "stop jarvis", "ok stop",
+    "okay stop", "jarvis go to sleep", "jarvis sleep", "jarvis standby", "jarvis mute",
+    "நன்றி", "போதும்", "முடிந்தது", "நிறுத்து"
 }
 
 
@@ -33,7 +35,14 @@ def is_dismissal(command: str) -> bool:
     cmd = command.strip().lower().rstrip(".!?,")
     if cmd in DISMISSAL_PHRASES:
         return True
-    if any(cmd.startswith(prefix) for prefix in ("stop", "bye", "thank you", "thanks", "go to sleep", "never mind", "that's all", "thats all")):
+    prefixes = (
+        "stop", "bye", "goodbye", "good bye", "thank you", "thanks",
+        "go to sleep", "sleep now", "never mind", "nevermind",
+        "that's all", "thats all", "that is all", "standby", "stand by"
+    )
+    if any(cmd.startswith(prefix) for prefix in prefixes):
+        return True
+    if any(cmd.endswith(suffix) for suffix in ("stop", "go to sleep", "standby", "stand by", "sleep", "mute")):
         return True
     return False
 
@@ -98,6 +107,34 @@ def translate_tamil_to_english(cmd: str) -> str:
         content = diary_write_match.group(2).strip()
         return f"diary {content}"
 
+    # 5.5 Write / Take notes in a file (Tamil)
+    write_file_match = re.match(r"^(.*)\s+(இல்|க்கு)\s+(எழுது|குறிப்பு எடு)\s*(.*)$", t)
+    if write_file_match:
+        filename = write_file_match.group(1).strip()
+        content = write_file_match.group(4).strip()
+        return f"write in {filename} {content}".strip()
+
+    # 5.6 Rename file (Tamil)
+    rename_match = re.match(r"^(.*)\s+(ஃபைலை|கோப்பை)\s+(.*)\s+(என்று|ஆக)\s+(பெயர் மாற்று|மாற்று)$", t)
+    if rename_match:
+        old_f = rename_match.group(1).strip()
+        new_f = rename_match.group(3).strip()
+        return f"rename file {old_f} to {new_f}"
+
+    # 5.7 Copy file (Tamil)
+    copy_match = re.match(r"^(.*)\s+(ஃபைலை|கோப்பை)\s+(.*)\s+(க்கு|ஆக)\s+(நகலெடு|காப்பி செய்)$", t)
+    if copy_match:
+        src_f = copy_match.group(1).strip()
+        dst_f = copy_match.group(3).strip()
+        return f"copy file {src_f} to {dst_f}"
+
+    # 5.8 Move / Cut file (Tamil)
+    move_match = re.match(r"^(.*)\s+(ஃபைலை|கோப்பை)\s+(.*)\s+(க்கு|ஆக)\s+(நகர்த்து|கட் செய்)$", t)
+    if move_match:
+        src_f = move_match.group(1).strip()
+        dst_f = move_match.group(3).strip()
+        return f"move file {src_f} to {dst_f}"
+
     # 6. Create file
     create_match = re.match(r"^(.*)\s+(கோப்பு உருவாக்கு|ஃபைல் உருவாக்கு|உருவாக்கு)$", t)
     if create_match:
@@ -141,6 +178,37 @@ def translate_tamil_to_english(cmd: str) -> str:
     return t
 
 
+def split_dot_commands(text: str) -> list[str]:
+    """
+    Split command text by verbal 'dot', 'period', 'full stop', 'புள்ளி', or punctuation '.'
+    Returns a list of clean, non-empty command strings executed in sequence.
+    """
+    if not text:
+        return []
+
+    # If it's an explicit diary entry like "diary. some notes", preserve it
+    if re.match(r"^diary\s*[.:,]\s*", text, re.I):
+        cleaned = re.sub(r"\s+\b(dot|full\s*stop|period|புள்ளி)\b\.?$", "", text, flags=re.IGNORECASE).rstrip(". ")
+        return [cleaned] if cleaned else [text.strip()]
+
+    # Preserve URLs (like google.com) and decimal numbers (like 3.14) while splitting commands on dot / period / verbal dot
+    # Replace explicit verbal dots with a distinct separator token
+    s = re.sub(r"\b(dot|full\s*stop|period|புள்ளி)\b", " <CMD_SEP> ", text, flags=re.IGNORECASE)
+
+    # Also treat sentence-ending periods (period followed by whitespace or end of string) as separator,
+    # except when directly between digits (3.14) or letters without space (google.com)
+    s = re.sub(r"(?<!\d)\.(?:\s+|$)", " <CMD_SEP> ", s)
+
+    parts = s.split("<CMD_SEP>")
+    commands = []
+    for p in parts:
+        cleaned = p.strip().strip(",:;!?- ")
+        if cleaned:
+            commands.append(cleaned)
+
+    return commands if commands else [text.strip()]
+
+
 class CommandRouter:
     def __init__(self, config: dict) -> None:
         self._config = config
@@ -152,10 +220,28 @@ class CommandRouter:
 
     def route(self, command: str) -> str:
         """Dispatch *command* to the appropriate handler and return a response."""
+        if not command or not command.strip():
+            return "What can I help you with?"
+
+        sub_commands = split_dot_commands(command)
+        if len(sub_commands) > 1:
+            responses = []
+            for sub_cmd in sub_commands:
+                res = self._route_single(sub_cmd)
+                if res:
+                    responses.append(res)
+            return " ".join(responses) if responses else "Done."
+        elif len(sub_commands) == 1:
+            return self._route_single(sub_commands[0])
+        else:
+            return self._route_single(command)
+
+    def _route_single(self, command: str) -> str:
+        """Dispatch a single atomic command to the appropriate handler."""
         translated_command = translate_tamil_to_english(command)
         cmd = translated_command.strip().lower()
         cmd = cmd.replace("dairy", "diary")
-        logger.debug("Routing command: %s (original: %s)", cmd, command)
+        logger.debug("Routing single command: %s (original: %s)", cmd, command)
 
         # ── Safety: no delete ────────────────────────────────────────────────
         if any(w in cmd for w in ("delete", "remove", "erase", "unlink")):
@@ -207,6 +293,101 @@ class CommandRouter:
         if cmd.startswith("create file "):
             name = translated_command[len("create file "):].strip()
             return files.create_file(name)
+
+        # ── Write / Add / Take notes to specific file ────────────────────────
+        # 1. "take notes for/in/to <filename> <content>" / "takes notes for <filename> <content>"
+        match_take_notes = re.match(
+            r"^(?:take|takes)\s+notes?\s+(?:for|in|on|to)\s+([a-zA-Z0-9_\- .]+?)(?:\s+(?:that|saying|:|content|is)\s+|\s*:\s*|\s+)(.+)$",
+            translated_command,
+            re.IGNORECASE
+        )
+        if match_take_notes:
+            fname = match_take_notes.group(1).strip()
+            content = match_take_notes.group(2).strip()
+            return files.write_to_file(fname, content, self._search_paths)
+
+        # 2. "add (this)? to/in <filename> <content>" / "copy (this)? to <filename> <content>" / "have (this)? to <filename> <content>" / "save to <filename> <content>"
+        match_add_to = re.match(
+            r"^(?:add|copy|have|save|append)\s+(?:this\s+)?(?:to|in|into)\s+([a-zA-Z0-9_\- .]+?)(?:\s+(?:that|saying|:|content|is)\s+|\s*:\s*|\s+)(.+)$",
+            translated_command,
+            re.IGNORECASE
+        )
+        if match_add_to:
+            fname = match_add_to.group(1).strip()
+            content = match_add_to.group(2).strip()
+            return files.write_to_file(fname, content, self._search_paths)
+
+        # 3. "write (to/in/into) <filename> <content>"
+        match_write_to = re.match(
+            r"^write\s+(?:to|in|into)\s+([a-zA-Z0-9_\- .]+?)(?:\s+(?:that|saying|:|content|is)\s+|\s*:\s*|\s+)(.+)$",
+            translated_command,
+            re.IGNORECASE
+        )
+        if match_write_to:
+            fname = match_write_to.group(1).strip()
+            content = match_write_to.group(2).strip()
+            return files.write_to_file(fname, content, self._search_paths)
+
+        # 4. "note down (in/to/for) <filename> <content>" / "record in <filename> <content>"
+        match_note_down = re.match(
+            r"^(?:note\s+down|record)\s+(?:in|to|for|into)\s+([a-zA-Z0-9_\- .]+?)(?:\s+(?:that|saying|:|content|is)\s+|\s*:\s*|\s+)(.+)$",
+            translated_command,
+            re.IGNORECASE
+        )
+        if match_note_down:
+            fname = match_note_down.group(1).strip()
+            content = match_note_down.group(2).strip()
+            return files.write_to_file(fname, content, self._search_paths)
+
+        # 5. "write <filename> : <content>" or "write <filename> that/saying <content>"
+        match_write_direct = re.match(
+            r"^write\s+([a-zA-Z0-9_\- .]+?)(?:\s*:\s*|\s+(?:that|saying|content)\s+)(.+)$",
+            translated_command,
+            re.IGNORECASE
+        )
+        if match_write_direct:
+            fname = match_write_direct.group(1).strip()
+            content = match_write_direct.group(2).strip()
+            return files.write_to_file(fname, content, self._search_paths)
+
+        # 6. "write <filename>" without content
+        if re.match(r"^(?:write\s+(?:to|in|into)?|take\s+notes?\s+(?:for|in|to)|add\s+(?:this\s+)?to|copy\s+(?:this\s+)?to|have\s+(?:this\s+)?to)\s+([a-zA-Z0-9_\- .]+)$", cmd):
+            fname_match = re.search(r"\b(?:to|in|into|for|write)\s+([a-zA-Z0-9_\- .]+)$", cmd)
+            fname = fname_match.group(1).strip() if fname_match else "notes"
+            return f"What would you like me to write in {fname}?"
+
+        # ── Rename File ──────────────────────────────────────────────────────
+        match_rename = re.match(
+            r"^(?:rename(?:\s+file)?|change(?:\s+the)?(?:\s+file)?\s+name\s+of)\s+([a-zA-Z0-9_\- .]+?)\s+(?:to|as)\s+([a-zA-Z0-9_\- .]+)$",
+            translated_command,
+            re.IGNORECASE
+        )
+        if match_rename:
+            old_f = match_rename.group(1).strip()
+            new_f = match_rename.group(2).strip()
+            return files.rename_file(old_f, new_f, self._search_paths)
+
+        # ── Copy / Paste File ────────────────────────────────────────────────
+        match_copy_paste = re.match(
+            r"^(?:copy(?:\s+file)?)\s+([a-zA-Z0-9_\- .]+?)\s+(?:and\s+paste(?:\s+it)?\s+as|to|as)\s+([a-zA-Z0-9_\- .]+)$",
+            translated_command,
+            re.IGNORECASE
+        )
+        if match_copy_paste and not any(p in cmd for p in ("take notes", "add this to", "copy this to", "have this to", "write")):
+            src_f = match_copy_paste.group(1).strip()
+            dst_f = match_copy_paste.group(2).strip()
+            return files.copy_file(src_f, dst_f, self._search_paths)
+
+        # ── Cut / Move File ──────────────────────────────────────────────────
+        match_move = re.match(
+            r"^(?:cut(?:\s+file)?|move(?:\s+file)?)\s+([a-zA-Z0-9_\- .]+?)\s+(?:and\s+paste(?:\s+it)?\s+as|to|into|as)\s+([a-zA-Z0-9_\- .]+)$",
+            translated_command,
+            re.IGNORECASE
+        )
+        if match_move:
+            src_f = match_move.group(1).strip()
+            dst_f = match_move.group(2).strip()
+            return files.move_file(src_f, dst_f, self._search_paths)
 
         # ── Search ───────────────────────────────────────────────────────────
         if cmd == "search" or cmd.startswith("search "):
@@ -400,7 +581,35 @@ class CommandRouter:
             text = action_dict.get("text", "")
             return diary.append_diary_entry(text)
 
-        # 8. Time/Date/Weather info fallback
+        # 8. Write/Append to named file
+        elif action in ("write_file", "append_file", "write_to_file"):
+            from jarvis.handlers import files
+            fname = action_dict.get("file") or action_dict.get("name") or action_dict.get("filename", "notes")
+            content = action_dict.get("text") or action_dict.get("content", "")
+            return files.write_to_file(fname, content, self._search_paths)
+
+        # 8.1 Rename file
+        elif action in ("rename_file", "rename"):
+            from jarvis.handlers import files
+            old_f = action_dict.get("old_name") or action_dict.get("source") or action_dict.get("file", "")
+            new_f = action_dict.get("new_name") or action_dict.get("destination") or action_dict.get("name", "")
+            return files.rename_file(old_f, new_f, self._search_paths)
+
+        # 8.2 Copy file
+        elif action in ("copy_file", "copy"):
+            from jarvis.handlers import files
+            src_f = action_dict.get("source") or action_dict.get("old_name") or action_dict.get("file", "")
+            dst_f = action_dict.get("destination") or action_dict.get("new_name") or action_dict.get("target", "")
+            return files.copy_file(src_f, dst_f, self._search_paths)
+
+        # 8.3 Cut / Move file
+        elif action in ("move_file", "cut_file", "cut", "move"):
+            from jarvis.handlers import files
+            src_f = action_dict.get("source") or action_dict.get("old_name") or action_dict.get("file", "")
+            dst_f = action_dict.get("destination") or action_dict.get("new_name") or action_dict.get("target", "")
+            return files.move_file(src_f, dst_f, self._search_paths)
+
+        # 9. Time/Date/Weather info fallback
         elif action == "tell_time":
             from jarvis.handlers import info
             return info.tell_time()

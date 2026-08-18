@@ -102,49 +102,46 @@ def main() -> None:
                     set_status("listening", "Listening... speak your command now")
                     command = listener.capture_command(timeout=LISTEN_TIMEOUT)
 
-                # ── Phase 3: Handle initial timeout ──────────────────────
-                if not command:
-                    timeout_msg = "I didn't catch that. Say Hey Jarvis when you're ready."
-                    speak(timeout_msg)
-                    set_status("waiting", timeout_msg)
-                    add_history("(no speech/timeout)", timeout_msg, ok=False)
-                    time.sleep(0.3)
-                    set_status("idle", 'Ready. Say "Hey Jarvis" followed by your command.')
-                    continue
+                # ── Phase 3: Route initial command ───────────────────────
+                if command:
+                    set_status("processing", f'Processing: "{command}"')
+                    response = router.route(command)
+                    speak(response)
+                    add_history(command, response, ok=True)
+                    if response != "Opening manual diary panel.":
+                        set_status("idle", f'Done: {response[:60]}{"…" if len(response) > 60 else ""}')
 
-                # ── Phase 4: Route initial command ───────────────────────
-                set_status("processing", f'Processing: "{command}"')
-                response = router.route(command)
-                speak(response)
-                add_history(command, response, ok=True)
-                if response != "Opening manual diary panel.":
-                    set_status("idle", f'Done: {response[:60]}{"…" if len(response) > 60 else ""}')
+                    from jarvis.router import is_dismissal
+                    if is_dismissal(command):
+                        set_status("idle", 'Standing by. Say "Hey Jarvis" when ready.')
+                        continue
 
-                from jarvis.router import is_dismissal
-                if is_dismissal(command):
-                    continue
-
-                # ── Phase 5: Continuous Conversation Follow-Up Loop ──────
+                # ── Phase 4: Continuous Active Listening Loop ────────────
                 if continuous_conversation:
-                    logger.info("Entering continuous conversation mode (timeout: %.1fs)...", follow_up_timeout)
+                    logger.info("Entering continuous conversation mode (active until 'stop')...")
                     while True:
-                        set_status("listening", "Listening for follow-up... (say 'stop' or wait to sleep)")
-                        follow_up = listener.capture_command(timeout=int(follow_up_timeout))
+                        set_status("listening", "Listening... (say 'stop' to standby)")
+                        follow_up = listener.capture_command(timeout=LISTEN_TIMEOUT)
 
                         if not follow_up:
-                            logger.info("Follow-up silence timeout. Returning to wake-word standby.")
+                            # Silence timeout on this chunk: remain active and keep listening
+                            continue
+
+                        from jarvis.router import is_dismissal
+                        if is_dismissal(follow_up):
+                            logger.info("Dismissal command received: '%s'", follow_up)
+                            set_status("processing", f'Processing: "{follow_up}"')
+                            follow_up_res = router.route(follow_up)
+                            speak(follow_up_res)
+                            add_history(follow_up, follow_up_res, ok=True)
                             set_status("idle", 'Standing by. Say "Hey Jarvis" when ready.')
                             break
 
-                        logger.info("Follow-up command received: '%s'", follow_up)
+                        logger.info("Command received: '%s'", follow_up)
                         set_status("processing", f'Processing: "{follow_up}"')
                         follow_up_res = router.route(follow_up)
                         speak(follow_up_res)
                         add_history(follow_up, follow_up_res, ok=True)
-
-                        if is_dismissal(follow_up):
-                            set_status("idle", 'Standing by. Say "Hey Jarvis" when ready.')
-                            break
 
                         if follow_up_res != "Opening manual diary panel.":
                             set_status("idle", f'Done: {follow_up_res[:60]}{"…" if len(follow_up_res) > 60 else ""}')

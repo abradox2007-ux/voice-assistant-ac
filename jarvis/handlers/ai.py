@@ -34,9 +34,15 @@ SYSTEM_INSTRUCTION = (
     '   {"action": "search_google", "query": "search query"}\n'
     "7. To read the diary:\n"
     '   {"action": "read_diary"}\n'
-    "8. To write to the diary:\n"
-    '   {"action": "append_diary", "text": "entry content"}\n'
-    "9. To run multiple actions in sequence:\n"
+    "9. To write or take notes in a specific named file:\n"
+    '   {"action": "write_file", "file": "filename", "text": "notes/content to write"}\n'
+    "10. To rename an existing file:\n"
+    '   {"action": "rename_file", "old_name": "current_filename", "new_name": "new_filename"}\n'
+    "11. To copy an existing file:\n"
+    '   {"action": "copy_file", "source": "source_filename", "destination": "destination_filename"}\n'
+    "12. To cut / move an existing file:\n"
+    '   {"action": "move_file", "source": "source_filename", "destination": "destination_filename"}\n'
+    "13. To run multiple actions in sequence:\n"
     '   {"action": "multi", "commands": [array of action JSON objects]}\n'
     "\n"
     "Always reply in English. Keep any conversational 'reply' extremely brief and easy to read aloud by a text-to-speech engine."

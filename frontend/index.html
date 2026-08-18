@@ -693,6 +693,55 @@
   }
   .btn-delete-item:hover { opacity: 1; }
 
+  /* ── File Manager Modal & Header ───────────────────────────── */
+  .files-list { display: flex; flex-direction: column; gap: 10px; max-height: 340px; overflow-y: auto; }
+  .file-item {
+    background: rgba(255,255,255,0.01);
+    border: 1px solid var(--border);
+    border-radius: 8px; padding: 12px;
+    transition: all 0.2s;
+    display: flex; justify-content: space-between; align-items: center; gap: 12px;
+  }
+  .file-item:hover {
+    background: rgba(255,255,255,0.03);
+    border-color: var(--muted);
+  }
+  .file-name { font-weight: 600; font-size: 14px; color: var(--text); display: flex; align-items: center; gap: 6px; }
+  .file-meta { font-size: 11px; font-family: var(--font-mono); color: var(--muted); margin-top: 2px; }
+  .file-actions { display: flex; gap: 6px; flex-shrink: 0; }
+  .file-btn {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 6px;
+    padding: 5px 9px;
+    font-size: 11px;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex; align-items: center; gap: 4px;
+  }
+  .file-btn:hover {
+    background: rgba(0, 210, 255, 0.15);
+    border-color: var(--accent);
+    color: #fff;
+  }
+  .header-nav-btn {
+    background: rgba(0, 210, 255, 0.08);
+    border: 1px solid rgba(0, 210, 255, 0.25);
+    color: var(--accent);
+    padding: 6px 12px;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .header-nav-btn:hover {
+    background: rgba(0, 210, 255, 0.2);
+    box-shadow: 0 0 12px rgba(0, 210, 255, 0.3);
+  }
+
   /* ── @property for CSS variable transitions ───────────────── */
   @property --phase-color {
     syntax: '<color>';
@@ -711,7 +760,11 @@
       <span class="brand-tag">HOLOGRAPHIC AI</span>
       <span>v1.0</span>
     </div>
-    <div class="conn-dot" id="connDot"></div>
+    <div style="display: flex; align-items: center; gap: 8px; margin-left: auto;">
+      <button class="header-nav-btn" onclick="openDiaryModal()">📖 Diary</button>
+      <button class="header-nav-btn" onclick="openFilesModal()">📁 Files</button>
+      <div class="conn-dot" id="connDot"></div>
+    </div>
   </header>
 
   <main>
@@ -845,6 +898,10 @@
       <span class="cmd-chip" onclick="quickFillCommand('set ac to 22')">set ac to 22</span>
       <span class="cmd-chip" onclick="quickFillCommand('diary hello world')">diary [entry]</span>
       <span class="cmd-chip" onclick="quickFillCommand('read diary')">read diary</span>
+      <span class="cmd-chip" onclick="quickFillCommand('rename file old to new')">rename file</span>
+      <span class="cmd-chip" onclick="quickFillCommand('copy file src to dest')">copy file</span>
+      <span class="cmd-chip" onclick="quickFillCommand('cut file src to dest')">cut file</span>
+      <span class="cmd-chip" onclick="quickFillCommand('take notes for notes')">take notes</span>
     </div>
   </footer>
 
@@ -904,6 +961,39 @@
       </div>
 
       <div id="modalToast" style="display:none; font-size:13px; padding:10px 14px; border-radius:8px; text-align:center; animation: fadeIn 0.2s;"></div>
+    </div>
+  </div>
+</div>
+
+<!-- File Manager & Editor Modal Overlay -->
+<div class="modal-overlay" id="filesModal">
+  <div class="modal-card" style="max-width: 650px;">
+    <div class="modal-header">
+      <h2 class="modal-title">📁 Data Files Manager</h2>
+      <button class="modal-close" onclick="closeFilesModal()">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div style="display: flex; gap: 8px; margin-bottom: 12px;">
+        <input type="text" id="fileFilterInput" class="chat-input-styled" placeholder="Search or filter files..." oninput="filterDataFiles()" style="flex:1;" />
+        <button class="header-nav-btn" onclick="fetchDataFiles()">🔄 Refresh</button>
+      </div>
+
+      <!-- List of Files -->
+      <div class="files-list" id="filesListContainer"></div>
+
+      <!-- Quick Editor Container -->
+      <div id="fileEditorContainer" style="display:none; flex-direction:column; gap:10px; margin-top:12px; border-top:1px solid var(--border); padding-top:12px;">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <span style="font-size:13px; font-weight:600; color:var(--accent);" id="editorFileName">Editing file.txt</span>
+          <button class="file-btn" onclick="closeFileEditor()">Close Editor</button>
+        </div>
+        <textarea class="textarea-styled" id="editorContent" style="min-height:140px; font-family:var(--font-mono); font-size:13px;"></textarea>
+        <div style="display:flex; gap:8px;">
+          <button class="btn-primary" onclick="saveActiveFile()">💾 Save Changes</button>
+        </div>
+      </div>
+
+      <div id="filesModalToast" style="display:none; font-size:13px; padding:10px 14px; border-radius:8px; text-align:center; margin-top:10px; animation: fadeIn 0.2s;"></div>
     </div>
   </div>
 </div>
@@ -1852,11 +1942,194 @@ async function deleteDiaryEntry(index, event) {
   }
 }
 
+function openDiaryModal() {
+  document.getElementById('diaryModal').classList.add('active');
+  switchDiaryTab('write');
+}
+
 async function closeDiaryModal() {
   document.getElementById('diaryModal').classList.remove('active');
   try {
     await fetch('/api/status/reset', { method: 'POST' });
   } catch (e) {}
+}
+
+/* ── File Manager Logic ───────────────────────────────────────── */
+let dataFiles = [];
+let activeEditingFile = '';
+
+function openFilesModal() {
+  document.getElementById('filesModal').classList.add('active');
+  fetchDataFiles();
+}
+
+function closeFilesModal() {
+  document.getElementById('filesModal').classList.remove('active');
+  closeFileEditor();
+}
+
+function showFilesToast(msg, type = 'success') {
+  const t = document.getElementById('filesModalToast');
+  if (!t) return;
+  t.style.display = 'block';
+  t.textContent = msg;
+  t.style.background = type === 'error' ? 'rgba(239, 68, 68, 0.2)' : 'rgba(0, 210, 255, 0.15)';
+  t.style.border = type === 'error' ? '1px solid var(--red)' : '1px solid var(--accent)';
+  t.style.color = type === 'error' ? 'var(--red)' : 'var(--accent)';
+  setTimeout(() => { t.style.display = 'none'; }, 3500);
+}
+
+async function fetchDataFiles() {
+  try {
+    const res = await fetch('/api/files');
+    dataFiles = await res.json();
+    renderDataFiles(dataFiles);
+  } catch (e) {
+    showFilesToast('Failed to load data files.', 'error');
+  }
+}
+
+function filterDataFiles() {
+  const q = (document.getElementById('fileFilterInput').value || '').toLowerCase().trim();
+  if (!q) {
+    renderDataFiles(dataFiles);
+    return;
+  }
+  const filtered = dataFiles.filter(f => f.name.toLowerCase().includes(q) || (f.preview && f.preview.toLowerCase().includes(q)));
+  renderDataFiles(filtered);
+}
+
+function renderDataFiles(list) {
+  const container = document.getElementById('filesListContainer');
+  if (!container) return;
+  if (!list || list.length === 0) {
+    container.innerHTML = `<div class="empty-state">No data files found. Create one with "create file [name]"!</div>`;
+    return;
+  }
+
+  container.innerHTML = list.map(f => `
+    <div class="file-item ${activeEditingFile === f.name ? 'selected' : ''}" id="fileItem_${escHtml(f.name).replace(/[^a-zA-Z0-9]/g, '_')}">
+      <div style="flex:1; min-width:0; cursor:pointer;" onclick="openFileEditor('${escHtml(f.name)}')">
+        <div class="file-name">📄 ${escHtml(f.name)}</div>
+        <div class="file-meta">${f.modified} · ${(f.size / 1024).toFixed(1)} KB</div>
+      </div>
+      <div class="file-actions">
+        <button class="file-btn" style="color:var(--accent); border-color:rgba(0,210,255,0.3);" onclick="openFileEditor('${escHtml(f.name)}')">👁️ View Content</button>
+        <button class="file-btn" onclick="promptRenameFile('${escHtml(f.name)}')">🏷️ Rename</button>
+        <button class="file-btn" onclick="promptCopyFile('${escHtml(f.name)}')">📋 Copy</button>
+        <button class="file-btn" onclick="promptMoveFile('${escHtml(f.name)}')">✂️ Cut/Move</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+async function promptRenameFile(oldName) {
+  const newName = prompt(`Enter new name for '${oldName}':`, oldName.replace(/\.[^/.]+$/, ""));
+  if (!newName || newName.trim() === '' || newName.trim() === oldName) return;
+
+  try {
+    const res = await fetch('/api/files/rename', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ old_name: oldName, new_name: newName.trim() })
+    });
+    const data = await res.json();
+    showFilesToast(data.message || 'File renamed successfully!', data.success ? 'success' : 'error');
+    if (activeEditingFile === oldName) activeEditingFile = '';
+    fetchDataFiles();
+  } catch (e) {
+    showFilesToast('Error renaming file.', 'error');
+  }
+}
+
+async function promptCopyFile(sourceName) {
+  const destName = prompt(`Copy '${sourceName}' as new file name:`, sourceName.replace(/\.[^/.]+$/, "") + "_copy");
+  if (!destName || destName.trim() === '') return;
+
+  try {
+    const res = await fetch('/api/files/copy', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ source: sourceName, destination: destName.trim() })
+    });
+    const data = await res.json();
+    showFilesToast(data.message || 'File copied successfully!', data.success ? 'success' : 'error');
+    fetchDataFiles();
+  } catch (e) {
+    showFilesToast('Error copying file.', 'error');
+  }
+}
+
+async function promptMoveFile(sourceName) {
+  const destName = prompt(`Move/Cut '${sourceName}' to new file name:`, sourceName);
+  if (!destName || destName.trim() === '' || destName.trim() === sourceName) return;
+
+  try {
+    const res = await fetch('/api/files/move', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ source: sourceName, destination: destName.trim() })
+    });
+    const data = await res.json();
+    showFilesToast(data.message || 'File moved successfully!', data.success ? 'success' : 'error');
+    if (activeEditingFile === sourceName) activeEditingFile = '';
+    fetchDataFiles();
+  } catch (e) {
+    showFilesToast('Error moving file.', 'error');
+  }
+}
+
+async function openFileEditor(name) {
+  activeEditingFile = name;
+  renderDataFiles(dataFiles);
+  const editorHeader = document.getElementById('editorFileName');
+  const textarea = document.getElementById('editorContent');
+  const container = document.getElementById('fileEditorContainer');
+
+  editorHeader.textContent = `📄 Loading ${name}...`;
+  textarea.value = 'Fetching file contents...';
+  container.style.display = 'flex';
+  container.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+  try {
+    const res = await fetch(`/api/files/read?name=${encodeURIComponent(name)}`);
+    const data = await res.json();
+    const content = data.content || '';
+    textarea.value = content;
+    const lines = content ? content.split('\n').length : 0;
+    editorHeader.textContent = `📄 ${name} (${lines} line${lines === 1 ? '' : 's'}, ${content.length} chars)`;
+  } catch (e) {
+    textarea.value = '';
+    editorHeader.textContent = `📄 Error opening ${name}`;
+    showFilesToast('Failed to read file content.', 'error');
+  }
+}
+
+function closeFileEditor() {
+  activeEditingFile = '';
+  renderDataFiles(dataFiles);
+  document.getElementById('fileEditorContainer').style.display = 'none';
+}
+
+async function saveActiveFile() {
+  if (!activeEditingFile) return;
+  const content = document.getElementById('editorContent').value;
+  try {
+    const res = await fetch('/api/files/save', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: activeEditingFile, content })
+    });
+    const data = await res.json();
+    if (data.success) {
+      showFilesToast(`Saved '${activeEditingFile}' successfully!`, 'success');
+      fetchDataFiles();
+    } else {
+      showFilesToast('Failed to save file.', 'error');
+    }
+  } catch (e) {
+    showFilesToast('Error saving file.', 'error');
+  }
 }
 
 function showToast(msg, type) {
