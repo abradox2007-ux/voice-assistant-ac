@@ -164,7 +164,7 @@ def main() -> None:
     except KeyboardInterrupt:
         logger.info("Shutting down on user interrupt.")
         speak("Goodbye.")
-        set_status("idle", "AC is offline.")
+        set_status("idle", "Jarvis is offline.")
     finally:
         shutdown_speech()
 

@@ -12,7 +12,7 @@ app = Flask(__name__, static_folder="frontend")
 _lock = Lock()
 _state: dict = {
     "phase": "idle",          # idle | waiting | listening | processing | error
-    "message": "AC is offline.",
+    "message": "Jarvis is offline.",
     "updated_at": time.time(),
 }
 _history: deque = deque(maxlen=50)   # most-recent 50 commands
